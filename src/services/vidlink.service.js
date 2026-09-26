@@ -1,9 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { SCRAPER } from '../config/constants.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const require = createRequire(import.meta.url);
 
 let wasmReady = false;
 let bootPromise = null;
@@ -15,9 +17,12 @@ async function bootWasm() {
     globalThis.self = globalThis;
     globalThis.document = { createElement: () => ({}), body: { appendChild: () => {} } };
 
-    const sodium = await import('libsodium-wrappers');
-    await sodium.default.ready;
-    globalThis.sodium = sodium.default;
+    // libsodium-wrappers 0.7.16 ESM entry imports ./libsodium.mjs yang tidak
+    // disertakan dalam paket npm (hanya ada di manual copy) sehingga gagal di
+    // Vercel. Build CommonJS-nya self-contained & resolve via node_modules.
+    const sodium = require('libsodium-wrappers');
+    await sodium.ready;
+    globalThis.sodium = sodium;
 
     const root = path.resolve(__dirname, '..', 'scraper');
     const boot = fs.readFileSync(path.join(root, 'wasm-bootstrap.js'), 'utf8');
