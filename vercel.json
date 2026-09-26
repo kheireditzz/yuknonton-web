@@ -2,14 +2,12 @@
   "version": 2,
   "outputDirectory": "public",
   "functions": {
-    "api/index.js": {
-      "memory": 1024,
+    "api/[...path].js": {
       "maxDuration": 60,
-      "includeFiles": "{src/**,public/**}"
+      "includeFiles": "{src/**,public/img/**}"
     }
   },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/index" },
-    { "source": "/proxy/hls", "destination": "/api/index" }
+    { "source": "/proxy/hls", "destination": "/api/proxy-hls" }
   ]
 }

@@ -34,8 +34,17 @@ const MIME_TYPES = {
 };
 
 export async function handleRequest(req, res) {
+  // Vercel catch-all rewrite menimpa req.url menjadi /api/[...path] (atau
+  // /api/index). Rekonstruksi path asli dari header rewrite bila ada.
+  const rewritten = process.env.VERCEL_REWRITE ?? req.headers['x-vercel-rewrite-path'] ?? req.headers['x-mw-path'] ?? '';
+  if (rewritten && rewritten.startsWith('/')) {
+    const q = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
+    req.url = rewritten + q;
+  }
   const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-  const pathname = parsedUrl.pathname;
+  let pathname = parsedUrl.pathname;
+  // Alias internal: rewrite Vercel /proxy/hls → /api/proxy-hls
+  if (pathname === '/api/proxy-hls') pathname = '/proxy/hls';
 
   // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
