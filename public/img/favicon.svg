@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="YukNonton">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#00a3a3"/>
+      <stop offset="0.55" stop-color="#00807f"/>
+      <stop offset="1" stop-color="#004d4d"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.34"/>
+      <stop offset="0.45" stop-color="#ffffff" stop-opacity="0.06"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="play" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#dff3f2"/>
+    </linearGradient>
+    <linearGradient id="spark" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffc14d"/>
+      <stop offset="1" stop-color="#fe9900"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.42" r="0.6">
+      <stop offset="0" stop-color="#5ff0e6" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#5ff0e6" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="18" flood-color="#00312f" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <rect x="40" y="40" width="432" height="432" rx="118" fill="#003b3b" opacity="0.55"/>
+  <rect x="40" y="34" width="432" height="432" rx="118" fill="url(#bg)"/>
+  <rect x="40" y="34" width="432" height="432" rx="118" fill="url(#glow)"/>
+  <ellipse cx="200" cy="130" rx="200" ry="120" fill="url(#glass)"/>
+  <rect x="40" y="34" width="432" height="432" rx="118" fill="none" stroke="#ffffff" stroke-opacity="0.22" stroke-width="4"/>
+
+  <g filter="url(#soft)">
+    <path d="M232 186 L232 314 L340 250 Z"
+          fill="url(#play)" stroke="url(#play)" stroke-width="30"
+          stroke-linejoin="round"/>
+  </g>
+
+  <g transform="translate(360 146)">
+    <path d="M0 -30 C3 -12 12 -3 30 0 C12 3 3 12 0 30 C-3 12 -12 3 -30 0 C-12 -3 -3 -12 0 -30 Z"
+          fill="url(#spark)" stroke="#fff" stroke-opacity="0.5" stroke-width="3"/>
+  </g>
+</svg>

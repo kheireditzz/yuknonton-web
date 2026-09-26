@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "outputDirectory": "public",
+  "functions": {
+    "api/index.js": {
+      "memory": 1024,
+      "maxDuration": 60,
+      "includeFiles": "{src/**,public/**}"
+    }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index" },
+    { "source": "/proxy/hls", "destination": "/api/index" }
+  ]
+}

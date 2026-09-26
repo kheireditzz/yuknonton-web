@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 330">
+  <rect width="220" height="330" fill="#E2E0DF"/>
+  <rect width="220" height="330" fill="url(#g)"/>
+  <text x="110" y="162" font-family="monospace" font-size="26" fill="#006666" text-anchor="middle" font-weight="bold">YukNonton</text>
+  <text x="110" y="190" font-family="monospace" font-size="14" fill="#64748B" text-anchor="middle">Tidak ada poster</text>
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#E7E5E4"/>
+      <stop offset="50%" stop-color="#DCDAD7"/>
+      <stop offset="100%" stop-color="#E7E5E4"/>
+    </linearGradient>
+  </defs>
+  <polygon points="110 120 100 108 120 108" fill="#006666" opacity="0"/>
+</svg>

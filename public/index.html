@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="referrer" content="no-referrer">
+  <title>YukNonton - Platform Nonton Film Viral</title>
+  <meta name="description" content="YukNonton - Platform nonton film & serial viral mancanegara dan lokal dengan desain tactile neumorphism.">
+  <meta name="theme-color" content="#006666">
+  <link rel="icon" type="image/svg+xml" href="/img/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="96x96" href="/img/favicon-96.png">
+  <link rel="shortcut icon" href="/img/favicon-48.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/img/apple-touch-icon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="apple-mobile-web-app-title" content="YukNonton">
+  <meta property="og:title" content="YukNonton">
+  <meta property="og:site_name" content="YukNonton">
+  <meta property="og:description" content="Nonton film & serial viral, gratis, tanpa iklan.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="/img/icon-512.png">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:image" content="/img/icon-512.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/neumorphic.css?v=1.1.0">
+  <!-- HLS.js untuk memutar stream m3u8 -->
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js"></script>
+</head>
+<body>
+
+  <!-- Top Fixed Header -->
+  <header class="neu-header">
+    <a class="header-logo" id="headerLogo" title="YukNonton">
+      <div class="logo-badge">
+        <img class="logo-mark" src="/img/favicon.svg" alt="YukNonton" width="30" height="30">
+      </div>
+      <div>
+        <div class="logo-title">YukNonton</div>
+        <div class="logo-subtitle">Nonton Tanpa Ribet</div>
+      </div>
+    </a>
+
+    <div class="header-actions">
+      <button type="button" class="header-action-btn" id="headerSearchBtn" title="Cari Film & Serial" aria-label="Buka Pencarian">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+      </button>
+      <button type="button" class="header-action-btn" id="headerRefreshBtn" title="Segarkan" aria-label="Refresh Data">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="23 4 23 10 17 10"></polyline>
+          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Toast -->
+  <div class="neu-toast" id="neuToast" role="alert" aria-live="polite">
+    <div class="neu-toast-dot"></div>
+    <span id="toastMsg"></span>
+  </div>
+
+  <main class="container">
+
+    <!-- Dashboard (Home) -->
+    <div id="homeView">
+      <!-- Trending Banner -->
+      <div class="trending-banner">
+        <div class="banner-strip" id="bannerStrip"></div>
+        <div class="banner-dots" id="bannerDots"></div>
+      </div>
+
+      <!-- Search Bar -->
+      <div class="controls-wrapper">
+        <div class="search-container">
+          <input type="text" id="searchInput" class="neu-input" placeholder="Cari film atau serial..." enterkeyhint="search">
+          <button type="button" id="searchBtn" class="search-btn" title="Cari" aria-label="Cari">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Kategori Tabs -->
+        <div class="filter-tabs" id="filterTabs">
+          <button type="button" class="neu-tab-btn active" data-cat="trending">🔥 Trending</button>
+        </div>
+      </div>
+
+      <!-- Section Header -->
+      <div class="section-header">
+        <div class="section-title">
+          <div class="section-icon">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="23 7 16 12 23 17 23 7"></polygon>
+              <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+            </svg>
+          </div>
+          <span id="sectionLabel">Daftar Film</span>
+          <span class="live-badge" id="liveBadge" style="display:none;"><span class="live-dot"></span>LIVE</span>
+        </div>
+        <span class="section-count" id="sectionCount">…</span>
+      </div>
+
+      <!-- Movies Grid -->
+      <div id="moviesGrid" class="movies-grid"></div>
+
+      <!-- Muat Lebih Banyak -->
+      <div class="load-more-wrap" id="loadMoreWrap" style="display:none;">
+        <button type="button" class="tactile-btn load-more-btn" id="loadMoreBtn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          <span id="loadMoreLabel">Muat Lebih Banyak</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Detail View -->
+    <div id="detailView" class="detail-view">
+      <div class="detail-hero" id="detailHero"></div>
+      <div id="episodePicker" class="episode-picker" style="display:none;">
+        <div class="overview-label">Pilih Episode</div>
+        <div class="season-tabs" id="seasonTabs"></div>
+        <div class="episode-list" id="episodeList"></div>
+      </div>
+      <div class="detail-lower">
+        <div class="detail-poster-box" id="detailPoster"></div>
+        <div class="detail-overview" id="detailOverview"></div>
+      </div>
+      <div class="predictions-panel">
+        <div class="overview-label">Prediksi Box-Office</div>
+        <div id="predictionsBody" class="detail-facts"></div>
+      </div>
+    </div>
+
+    <!-- Search Result View -->
+    <div id="searchView" class="search-view">
+      <div class="section-header">
+        <div class="section-title">
+          <div class="section-icon">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          </div>
+          <span id="searchResultTitle">Hasil Pencarian</span>
+        </div>
+        <span class="section-count" id="searchCount">…</span>
+      </div>
+      <div id="searchResults" class="movies-grid"></div>
+      <div class="search-hero-hint" id="searchEmpty">Ketik judul untuk mulai mencari.</div>
+    </div>
+
+    <!-- Watch View (Full Page Player) -->
+    <div id="watchView" class="watch-view">
+      <!-- Baris 1: video naik ke atas -->
+      <div class="watch-stage" id="watchStage">
+        <div class="watch-video-wrap">
+          <video id="playerVideo" class="player-video" controls autoplay playsinline webkit-playsinline poster=""></video>
+          <div id="playerStatus" class="player-loading">Menghubungi server streaming…</div>
+          <div id="playerError" class="player-error" style="display:none;"></div>
+        </div>
+
+        <!-- Kontrol bar: kembali, resolusi, minimize, layar penuh -->
+        <div class="watch-controls" id="watchControls">
+          <div class="watch-controls-left">
+            <button type="button" class="watch-ctrl-btn" id="playerBackBtn" title="Kembali" aria-label="Kembali">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+              <span>Kembali</span>
+            </button>
+          </div>
+          <div class="watch-controls-right">
+            <div class="quality-picker" id="qualityPicker" style="display:none;">
+              <button type="button" class="watch-ctrl-btn quality-toggle" id="qualityToggle" title="Pilih Resolusi" aria-label="Pilih Resolusi">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"></rect><path d="M17 2l-5 5-5-5"></path></svg>
+                <span id="qualityLabel">Auto</span>
+              </button>
+              <div class="quality-menu" id="qualityMenu"></div>
+            </div>
+            <button type="button" class="watch-ctrl-btn" id="playerMinimizeBtn" title="Minimize" aria-label="Minimize Pemutar">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              <span>Minimize</span>
+            </button>
+            <button type="button" class="watch-ctrl-btn" id="playerFullscreenBtn" title="Layar Penuh" aria-label="Layar Penuh">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"></path><path d="M16 3h3a2 2 0 0 1 2 2v3"></path><path d="M8 21H5a2 2 0 0 1-2-2v-3"></path><path d="M16 21h3a2 2 0 0 0 2-2v-3"></path></svg>
+              <span>Layar Penuh</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Baris 2: judul, aksi, deskripsi singkat -->
+      <div class="watch-info">
+        <div class="watch-info-head">
+          <h1 class="watch-title" id="watchTitle">Memuat…</h1>
+          <div class="watch-sub" id="watchSub"></div>
+        </div>
+
+        <div class="watch-actions">
+          <button type="button" class="like-btn" id="likeBtn" aria-label="Suka">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v12"></path><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"></path></svg>
+            <span id="likeCount">0</span>
+          </button>
+          <button type="button" class="like-btn dislike" id="dislikeBtn" aria-label="Tidak Suka">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 14V2"></path><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"></path></svg>
+            <span id="dislikeCount">0</span>
+          </button>
+          <button type="button" class="like-btn" id="commentScrollBtn" aria-label="Ke Komentar">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+            <span id="commentCountChip">0</span>
+          </button>
+        </div>
+
+        <p class="watch-desc" id="watchDesc"></p>
+
+        <div class="watch-meta-grid" id="watchMeta"></div>
+
+        <!-- Poll Rating Pengguna -->
+        <div class="rating-poll" id="ratingPoll">
+          <div class="rating-poll-head">
+            <div class="overview-label" style="margin:0;">Poll Rating Pengguna</div>
+            <div class="rating-summary">
+              <span class="rating-avg" id="ratingAvg">0.0</span>
+              <span class="rating-avg-stars" id="ratingAvgStars">☆☆☆☆☆</span>
+              <span class="rating-total" id="ratingTotal">0 suara</span>
+            </div>
+          </div>
+          <div class="rating-stars" id="ratingStars" role="radiogroup" aria-label="Beri rating">
+            <button type="button" class="star-btn" data-score="1" aria-label="1 bintang">★</button>
+            <button type="button" class="star-btn" data-score="2" aria-label="2 bintang">★</button>
+            <button type="button" class="star-btn" data-score="3" aria-label="3 bintang">★</button>
+            <button type="button" class="star-btn" data-score="4" aria-label="4 bintang">★</button>
+            <button type="button" class="star-btn" data-score="5" aria-label="5 bintang">★</button>
+          </div>
+          <div class="rating-bars" id="ratingBars"></div>
+        </div>
+      </div>
+
+      <!-- Baris 3: komentar -->
+      <div class="watch-comments" id="watchComments">
+        <div class="overview-label">Komentar (<span id="commentCount">0</span>)</div>
+
+        <form class="comment-form" id="commentForm">
+          <input type="text" id="commentName" class="neu-input comment-name" maxlength="40" placeholder="Nama kamu (opsional)">
+          <div class="comment-input-row">
+            <input type="text" id="commentText" class="neu-input" maxlength="600" placeholder="Tulis komentar..." autocomplete="off">
+            <button type="submit" class="tactile-btn primary comment-send-btn" id="commentSendBtn">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+              Kirim
+            </button>
+          </div>
+        </form>
+
+        <div class="comment-list" id="commentList">
+          <div class="search-hero-hint">Belum ada komentar. Jadilah yang pertama!</div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Mini Player (melayang saat minimize) -->
+  <div class="mini-player" id="miniPlayer">
+    <div class="mini-frame">
+      <div class="mini-top">
+        <span class="mini-title" id="miniTitle">Memutar…</span>
+        <div class="mini-actions">
+          <button type="button" class="mini-btn" id="miniRestoreBtn" title="Perbesar" aria-label="Perbesar">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+          </button>
+          <button type="button" class="mini-btn" id="miniCloseBtn" title="Tutup" aria-label="Tutup">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+      </div>
+      <div class="mini-video-slot" id="miniVideoSlot"></div>
+    </div>
+  </div>
+
+  <footer class="footer-note">
+    YukNonton • Nonton film & serial viral • Data dari TMDB & vidlink.pro • Untuk edukasi semata
+  </footer>
+
+  <script src="/js/api.js?v=1.1.0"></script>
+  <script src="/js/core.js?v=1.1.0"></script>
+</body>
+</html>

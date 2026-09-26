@@ -1,0 +1,36 @@
+{
+  "name": "yuknonton-web",
+  "version": "1.0.0",
+  "description": "YukNonton - Platform streaming film & serial viral dengan desain tactile neumorphism: katalog realtime 31 kategori, pencarian, rating, komentar, dan pemutar HLS/MP4 adaptif.",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "homepage": "https://yuknonton.kheireditz.my.id",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kheireditzz/yuknonton-web.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kheireditzz/yuknonton-web/issues"
+  },
+  "keywords": [
+    "movie-streaming",
+    "scraper",
+    "neumorphism",
+    "tmdb",
+    "hls",
+    "vidlink",
+    "movie-player",
+    "pwa",
+    "vercel",
+    "nodejs"
+  ],
+  "author": "kheireditzz",
+  "license": "MIT",
+  "dependencies": {
+    "libsodium-wrappers": "^0.7.15"
+  }
+}
