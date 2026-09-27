@@ -1,7 +1,13 @@
 window.Api = (() => {
   async function get(url, signal) {
     const res = await fetch(url, { headers: { 'Accept': 'application/json' }, signal });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      const err = new Error(data.error || data.message || `HTTP ${res.status}`);
+      err.status = res.status;
+      err.code = data.error || '';
+      throw err;
+    }
     return res.json();
   }
 

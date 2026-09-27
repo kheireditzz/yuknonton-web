@@ -759,10 +759,18 @@ async function loadEpisodes(id, season) {
       $('#playerStatus').style.display = 'none';
       const errBox = $('#playerError');
       errBox.style.display = '';
-      errBox.innerHTML = playerErrorHtml(
-        'Sumber video tidak dapat dimuat.',
-        'Server sumber sedang tidak merespons atau judul ini belum memiliki tautan video. Coba beberapa saat lagi atau pilih judul lain.'
-      );
+      const notFound = err && (err.status === 404 || /not found/i.test(err.code || ''));
+      if (notFound) {
+        errBox.innerHTML = playerErrorHtml(
+          'Judul belum tersedia untuk diputar.',
+          'Sumber video untuk judul ini belum tersedia. Coba pilih judul lain, atau coba lagi nanti — katalog sumber terus diperbarui.'
+        );
+      } else {
+        errBox.innerHTML = playerErrorHtml(
+          'Sumber video tidak dapat dimuat.',
+          'Server sumber sedang tidak merespons. Periksa koneksi internet lalu coba lagi beberapa saat.'
+        );
+      }
     }
   }
 
