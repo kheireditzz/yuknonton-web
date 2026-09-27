@@ -56,3 +56,6 @@ export const CATALOG_BY_ID = Object.fromEntries(CATALOG.map(c => [c.id, c]));
 // TTL cache khusus katalog (ms). Cache service default tetap 5 menit.
 export const CATALOG_CACHE_TTL_MS = 10 * 60 * 1000;
 export const REALTIME_CACHE_TTL_MS = 90 * 1000;
+
+// Cache hasil resolve stream (vidlink) — membuat putar ulang & ganti-ganti judul instan.
+export const STREAM_CACHE_TTL_MS = 15 * 60 * 1000;

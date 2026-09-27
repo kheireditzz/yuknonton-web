@@ -3,6 +3,10 @@ import { getFromCache, setCache } from '../services/cache.service.js';
 import { listCategories, getCatalog } from '../services/catalog.service.js';
 import { resolveMovieStream, resolveTvStream } from '../services/vidlink.service.js';
 import { getComments, addComment, getLikes, applyLikeDelta, getRating, applyRating } from '../services/interactions.service.js';
+import { STREAM_CACHE_TTL_MS } from '../config/constants.js';
+
+// In-flight map: dedup request stream yang identik (mis. prefetch + user klik putar).
+const streamInflight = new Map();
 
 function readJsonBody(req) {
   return new Promise((resolve, reject) => {
@@ -175,11 +179,25 @@ export async function handleApiRoute(req, res, pathname, parsedUrl) {
       return;
     }
 
+    const cacheKey = type === 'tv'
+      ? `stream_tv_${id}_s${season || 1}_e${episode || 1}`
+      : `stream_movie_${id}`;
+
+    const cached = getFromCache(cacheKey, STREAM_CACHE_TTL_MS);
+    if (cached) {
+      res.writeHead(200, { 'X-Stream-Cache': 'hit' });
+      res.end(JSON.stringify({ id, type, playlist: cached, season, episode }));
+      return;
+    }
+
     try {
-      const playlist =
-        type === 'tv'
-          ? await resolveTvStream(id, season, episode)
-          : await resolveMovieStream(id);
+      let pending = streamInflight.get(cacheKey);
+      if (!pending) {
+        pending = (type === 'tv' ? resolveTvStream(id, season, episode) : resolveMovieStream(id))
+          .finally(() => streamInflight.delete(cacheKey));
+        streamInflight.set(cacheKey, pending);
+      }
+      const playlist = await pending;
 
       if (!playlist) {
         res.writeHead(404);
@@ -187,7 +205,8 @@ export async function handleApiRoute(req, res, pathname, parsedUrl) {
         return;
       }
 
-      res.writeHead(200);
+      setCache(cacheKey, playlist, STREAM_CACHE_TTL_MS);
+      res.writeHead(200, { 'X-Stream-Cache': 'miss' });
       res.end(JSON.stringify({ id, type, playlist, season, episode }));
     } catch (err) {
       res.writeHead(500);

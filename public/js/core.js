@@ -68,6 +68,16 @@
     watchAbort = null;
   }
 
+  // Prefetch sumber stream agar tombol putar langsung siap (server meng-cache hasilnya).
+  const prefetched = new Set();
+  function prefetchStream(id, type, season, episode) {
+    if (!id) return;
+    const key = (type || 'movie') + id + (season ? ':' + season + ':' + (episode || 1) : '');
+    if (prefetched.has(key)) return;
+    prefetched.add(key);
+    Api.prefetchPlay(id, type, season, episode);
+  }
+
   // ── Icon System (SVG stroke, no emoji) ───────────────────
   const ICON_PATHS = {
     trending: '<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline>',
@@ -224,7 +234,12 @@
         <span>${item.type === 'tv' ? 'Serial' : 'Film'}</span>
       </div>
     `;
-    el.addEventListener('click', () => openDetail(item.id, title, item.type || 'movie'));
+    el.addEventListener('click', () => {
+      // Prefetch lebih awal agar stream siap saat tombol putar ditekan
+      if ((item.type || 'movie') === 'tv') prefetchStream(item.id, 'tv', 1, 1);
+      else prefetchStream(item.id, 'movie');
+      openDetail(item.id, title, item.type || 'movie');
+    });
     return el;
   }
 
@@ -555,6 +570,10 @@
       `<div class="fact-cell"><div class="fact-label">${p.label}</div><div class="fact-value">${p.value}</div></div>`
     ).join('');
 
+    // Prefetch sumber stream saat detail dibuka → putar jadi instan
+    if (isTv) prefetchStream(d.id, 'tv', detailSelectedSeason || 1, 1);
+    else prefetchStream(d.id, 'movie');
+
     $('#playMainBtn').addEventListener('click', () => {
       if (isTv) playStream(d.id, 'tv', detailSelectedSeason || 1, 1, d.title);
       else playStream(d.id, 'movie', null, null, d.title);
@@ -600,6 +619,7 @@
         detailSelectedSeason = s.season;
         $$('#seasonTabs .season-tab').forEach(x => x.classList.toggle('active', Number(x.dataset.s) === s.season));
         loadEpisodes(id, s.season);
+        prefetchStream(id, 'tv', s.season, 1);
       });
       b.dataset.s = s.season;
       tabs.appendChild(b);
@@ -1339,6 +1359,22 @@ function closePlayer() {
     });
     playerVideo.addEventListener('pause', () => { setWatchProgress(); updateEpisodeBars(); });
     playerVideo.addEventListener('ended', () => { setWatchProgress(); updateEpisodeBars(); });
+
+    // Fullscreen pemutar → paksa orientasi landscape agar tidak terkunci portrait
+    const applyOrientation = (landscape) => {
+      const so = screen.orientation;
+      if (!so || typeof so.lock !== 'function') return;
+      if (landscape) so.lock('landscape').catch(() => {});
+      else if (typeof so.unlock === 'function') so.unlock();
+    };
+    const onFsChange = () => {
+      const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+      applyOrientation(!!fsEl && (fsEl === playerVideo || playerVideo.contains(fsEl) || fsEl.contains(playerVideo)));
+    };
+    document.addEventListener('fullscreenchange', onFsChange);
+    document.addEventListener('webkitfullscreenchange', onFsChange);
+    playerVideo.addEventListener('webkitbeginfullscreen', () => applyOrientation(true));
+    playerVideo.addEventListener('webkitendfullscreen', () => applyOrientation(false));
 
     $('#qualityToggle').addEventListener('click', (e) => {
       e.stopPropagation();

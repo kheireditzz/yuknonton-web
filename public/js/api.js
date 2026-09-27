@@ -33,6 +33,8 @@ window.Api = (() => {
     tvEpisodes: (id, season, signal) => get(`/api/tv/episodes?id=${encodeURIComponent(id)}&season=${encodeURIComponent(season)}`, signal),
     play: (id, type, season, episode, signal) =>
       get(`/api/play?id=${encodeURIComponent(id)}&type=${type || 'movie'}` + (season ? `&season=${season}&episode=${episode}` : ''), signal),
+    prefetchPlay: (id, type, season, episode) =>
+      get(`/api/play?id=${encodeURIComponent(id)}&type=${type || 'movie'}` + (season ? `&season=${season}&episode=${episode}` : '')).catch(() => null),
     comments: (id, signal) => get(`/api/comments?id=${encodeURIComponent(id)}`, signal),
     addComment: (id, payload, signal) => post(`/api/comments?id=${encodeURIComponent(id)}`, payload, signal),
     likes: (id, signal) => get(`/api/likes?id=${encodeURIComponent(id)}`, signal),
