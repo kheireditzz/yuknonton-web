@@ -898,6 +898,37 @@ async function loadEpisodes(id, season) {
     $('#qualityPicker').style.display = '';
   }
 
+  function proxySrc(u) { return '/proxy/hls?url=' + encodeURIComponent(u); }
+
+  // Putar media langsung dari CDN (cepat, tanpa relay serverless). Bila gagal
+  // (mis. CDN tertentu butuh Referer), otomatis fallback ke proxy.
+  function playMedia(video, url, token, onFatal) {
+    const stale = () => token !== undefined && !isWatchActive(token);
+    let triedProxy = false;
+    const hide = () => {
+      if (stale()) return;
+      $('#playerStatus').style.display = 'none';
+      video.removeEventListener('error', onError);
+    };
+    const onError = () => {
+      if (stale()) return;
+      if (!triedProxy) {
+        triedProxy = true;
+        video.src = proxySrc(url);
+        video.load();
+        video.play().catch(() => {});
+        return;
+      }
+      video.removeEventListener('error', onError);
+      if (typeof onFatal === 'function') onFatal();
+    };
+    video.addEventListener('error', onError);
+    video.addEventListener('loadedmetadata', hide, { once: true });
+    video.addEventListener('playing', hide, { once: true });
+    video.src = url;
+    video.play().catch(() => {});
+  }
+
   function selectQuality(k) {
     watchState.qualityKey = k;
     $$('#qualityMenu .quality-item').forEach(b => b.classList.toggle('active', b.dataset.key === k));
@@ -910,13 +941,18 @@ async function loadEpisodes(id, season) {
       destroyHls();
       const pos = video.currentTime;
       const wasPlaying = !video.paused;
-      video.src = '/proxy/hls?url=' + encodeURIComponent(watchState.qualities[k]);
       video.addEventListener('loadedmetadata', () => {
         try { video.currentTime = pos || 0; } catch (e) {}
         if (wasPlaying) video.play().catch(() => {});
       }, { once: true });
-      video.play().catch(() => {});
-      $('#playerStatus').style.display = 'none';
+      playMedia(video, watchState.qualities[k], watchSession, () => {
+        $('#playerStatus').style.display = 'none';
+        $('#playerError').style.display = '';
+        $('#playerError').innerHTML = playerErrorHtml(
+          'Resolusi ini gagal diputar.',
+          'Coba pilih resolusi lain dari menu Resolusi & Unduhan di atas.'
+        );
+      });
       return;
     }
     if (k === 'auto' && stream.playlist) {
@@ -931,15 +967,13 @@ async function loadEpisodes(id, season) {
     const mp4 = stream.mp4;
 
     if (mp4 && !forceHls) {
-      video.src = '/proxy/hls?url=' + encodeURIComponent(mp4);
-      video.addEventListener('loadeddata', () => { if (!stale()) $('#playerStatus').style.display = 'none'; }, { once: true });
-      video.play().catch((e) => {
-        if (stale()) return;
+      // Putar langsung dari CDN agar buffering instan (fallback ke proxy otomatis).
+      playMedia(video, mp4, token, () => {
         $('#playerStatus').style.display = 'none';
         $('#playerError').style.display = '';
         $('#playerError').innerHTML = playerErrorHtml(
           'Video gagal diputar.',
-          'Browser menolak memutar video ini secara otomatis. Tekan tombol putar pada video, atau pilih resolusi lain.'
+          'Tekan tombol putar pada video, atau pilih resolusi lain dari menu Resolusi & Unduhan.'
         );
       });
       return;
