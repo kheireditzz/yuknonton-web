@@ -411,6 +411,31 @@
     await loadCategories();
     await loadCatalog(activeCategory);
     loadBanner();
+    initAdCarousel();
+  }
+
+  // ── Carousel banner info (lapor bug + PlayMusic) ─────────
+  function initAdCarousel() {
+    const track = $('#adCarouselTrack');
+    const dots = $('#adCarouselDots');
+    if (!track || !dots) return;
+    const slides = Array.from(track.children);
+    if (dots.dataset.ready === '1') return;
+    dots.dataset.ready = '1';
+    slides.forEach((_, i) => {
+      const dot = document.createElement('button');
+      dot.type = 'button';
+      dot.className = 'ad-carousel-dot' + (i === 0 ? ' active' : '');
+      dot.setAttribute('aria-label', 'Slide ' + (i + 1));
+      dot.addEventListener('click', () => {
+        slides[i].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      });
+      dots.appendChild(dot);
+    });
+    track.addEventListener('scroll', () => {
+      const idx = Math.round(track.scrollLeft / Math.max(1, track.clientWidth));
+      Array.from(dots.children).forEach((d, i) => d.classList.toggle('active', i === idx));
+    }, { passive: true });
   }
 
   async function loadBanner() {

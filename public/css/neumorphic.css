@@ -198,6 +198,35 @@ header.neu-header {
   .ad-banner-cta { margin-left: 60px; }
 }
 
+/* ── Carousel banner info (lapor bug + PlayMusic) ────────── */
+.ad-carousel { margin: 2px 0 20px; }
+.ad-carousel-track {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.ad-carousel-track::-webkit-scrollbar { display: none; }
+.ad-carousel .ad-banner {
+  flex: 0 0 100%;
+  scroll-snap-align: center;
+  margin: 0;
+}
+.ad-carousel-dots {
+  display: flex; justify-content: center; gap: 6px; margin-top: 10px;
+}
+.ad-carousel-dot {
+  width: 7px; height: 7px; border-radius: 4px;
+  background: var(--shadow-dark);
+  border: none; padding: 0; cursor: pointer;
+  transition: all 0.2s ease;
+}
+.ad-carousel-dot.active { width: 20px; background: var(--color-primary); }
+.ad-banner-music .ad-banner-icon { background: #7A1E2E; box-shadow: 0 8px 18px rgba(122,30,46,0.35); }
+.ad-banner-music .ad-banner-cta { color: var(--color-ciak); }
+.ad-banner-music:hover .ad-banner-cta { background: var(--color-ciak); color: #fff; box-shadow: 0 8px 18px rgba(122,30,46,0.4); }
+
 /* ── Inline note (info/error/empty/loading) ──────────────── */
 .inline-note {
   display: flex; align-items: flex-start; gap: 12px;
