@@ -18,7 +18,9 @@
 
 ## ✨ Fitur
 
-- **31 kategori katalog** — Trending, Serial Hari Ini, Anime, Donghua, Drama (China/Jepang/Korea), Film, genre (Aksi, Horor, Thriller, Fantasi, Keluarga, Dokumenter, dll).
+- **38 kategori katalog** — Trending, **Film/Serial/Horor/Komedi/Drama Indonesia lengkap** (via discover TMDB), Serial Hari Ini, Anime, Donghua, Drama (China/Jepang/Korea), Film, genre (Aksi, Horor, Thriller, Fantasi, Keluarga, Dokumenter, dll).
+- **Baris campuran (slide)** — Rekomendasi, Trending, Favorit, Indonesia Pilihan, Serial, Anime & Donghua, Drama Asia, Horor & Thriller; tiap baris menggabungkan beberapa kategori lalu dicampur merata.
+- **Auto-slide carousel** — banner info (Lapor Bug + PlayMusic) dan banner film trending bergeser otomatis dengan dot, pause saat disentuh.
 - **Realtime-aware** — kategori bertanda `realtime` auto-refresh dengan TTL pendek + polling berkala di frontend.
 - **Pagination** — tombol "Muat Lagi" dengan dedupe otomatis per kategori.
 - **Pencarian** — query langsung ke sumber, hasil dengan poster & rating.
@@ -36,7 +38,7 @@ yuknonton-web/
 ├── server.js                 # HTTP server murni (static + routing) & entry Vercel
 ├── api/index.js              # Adapter serverless untuk Vercel
 ├── src/
-│   ├── config/constants.js   # 31 definisi kategori, TTL, header scraper
+│   ├── config/constants.js   # 38 definisi kategori + baris home, TTL, header scraper
 │   ├── routes/
 │   │   ├── api.routes.js     # Router REST API
 │   │   └── hls.proxy.js      # Proxy m3u8/segment + rewrite playlist
@@ -58,9 +60,10 @@ yuknonton-web/
 
 | Method | Endpoint | Deskripsi |
 |--------|----------|-----------|
-| `GET` | `/api/categories` | Daftar 31 kategori |
+| `GET` | `/api/categories` | Daftar 38 kategori |
 | `GET` | `/api/catalog?cat=<id>&page=<n>` | Kartu katalog per kategori |
 | `GET` | `/api/home` | Feed trending gabungan |
+| `GET` | `/api/rows` | Baris campuran beranda (rekomendasi/trending/favorit/dll) |
 | `GET` | `/api/search?q=<query>` | Pencarian judul |
 | `GET` | `/api/movie?id=<id>` / `/api/tv?id=<id>` | Detail film / serial |
 | `GET` | `/api/tv/seasons?id=<id>` | Daftar musim |

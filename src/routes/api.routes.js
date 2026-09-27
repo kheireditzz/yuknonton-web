@@ -1,6 +1,6 @@
 import { scrapeHome, scrapeMovieDetail, scrapeTvDetail, scrapeSearch, scrapeSeasons, scrapeEpisodes } from '../services/tmdb.service.js';
 import { getFromCache, setCache } from '../services/cache.service.js';
-import { listCategories, getCatalog } from '../services/catalog.service.js';
+import { listCategories, getCatalog, getRows } from '../services/catalog.service.js';
 import { resolveMovieStream, resolveTvStream } from '../services/vidlink.service.js';
 import { getComments, addComment, getLikes, applyLikeDelta, getRating, applyRating } from '../services/interactions.service.js';
 import { STREAM_CACHE_TTL_MS } from '../config/constants.js';
@@ -47,6 +47,19 @@ export async function handleApiRoute(req, res, pathname, parsedUrl) {
   if (pathname === '/api/categories') {
     res.writeHead(200);
     res.end(JSON.stringify({ data: listCategories() }));
+    return;
+  }
+
+  // ── HOME ROWS (baris campuran) ──
+  if (pathname === '/api/rows') {
+    const data = await getRows();
+    res.writeHead(200, { 'Cache-Control': 'public, max-age=120' });
+    res.end(JSON.stringify({
+      cached: data.cached,
+      timestamp: Date.now(),
+      count: data.rows.length,
+      data: data.rows
+    }));
     return;
   }
 

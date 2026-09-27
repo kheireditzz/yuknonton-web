@@ -32,8 +32,32 @@ function firstPosterUrl(html, size = IMG_POSTER) {
 }
 
 async function fetchPage(pathname) {
+  if (pathname.startsWith('/discover/')) return fetchDiscover(pathname);
   const res = await fetch(TMDB_BASE + pathname, {
     headers: { 'User-Agent': UA, 'Accept-Language': 'id-ID,id;q=0.9,en;q=0.8' },
+    signal: AbortSignal.timeout(20000)
+  });
+  if (!res.ok) throw new Error(`TMDB HTTP ${res.status}`);
+  return res.text();
+}
+
+// Halaman /discover di TMDB mengabaikan filter bahasa lewat GET, tetapi
+// endpoint partial /discover/<tipe>/items (POST, x-www-form-urlencoded)
+// menghormatinya. Dipakai untuk kategori Film Indonesia dan sejenisnya.
+async function fetchDiscover(pathname) {
+  const qIndex = pathname.indexOf('?');
+  const base = qIndex === -1 ? pathname : pathname.slice(0, qIndex);
+  const qs = qIndex === -1 ? '' : pathname.slice(qIndex + 1);
+  const itemsPath = base.replace(/\/$/, '') + '/items';
+  const res = await fetch(TMDB_BASE + itemsPath, {
+    method: 'POST',
+    headers: {
+      'User-Agent': UA,
+      'Accept-Language': 'id-ID,id;q=0.9,en;q=0.8',
+      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+      'X-Requested-With': 'XMLHttpRequest'
+    },
+    body: new URLSearchParams(qs),
     signal: AbortSignal.timeout(20000)
   });
   if (!res.ok) throw new Error(`TMDB HTTP ${res.status}`);

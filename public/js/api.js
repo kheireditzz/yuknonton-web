@@ -26,6 +26,7 @@ window.Api = (() => {
   return {
     home: (signal) => get('/api/home', signal),
     categories: (signal) => get('/api/categories', signal),
+    rows: (signal) => get('/api/rows', signal),
     catalog: (cat, page, signal) => get(`/api/catalog?cat=${encodeURIComponent(cat || 'trending')}` + (page ? `&page=${page}` : ''), signal),
     search: (q, signal) => get(`/api/search?q=${encodeURIComponent(q)}`, signal),
     movie: (id, type, signal) => get(`/api/${type === 'tv' ? 'tv' : 'movie'}?id=${encodeURIComponent(id)}`, signal),

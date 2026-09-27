@@ -103,6 +103,7 @@
     wand: '<path d="M15 4V2M15 16v-2M8 9h2M20 9h2M17.8 11.8 19 13M17.8 6.2 19 5M3 21l9-9M12.2 6.2 11 5"></path>',
     users: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"></path>',
     book: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>',
+    flag: '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path><line x1="4" y1="22" x2="4" y2="15"></line>',
     flame: '<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"></path>',
     leaf: '<path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z"></path><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"></path>',
     alert: '<circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line>',
@@ -412,30 +413,170 @@
     await loadCatalog(activeCategory);
     loadBanner();
     initAdCarousel();
+    loadRows();
+  }
+
+  // ── Baris campuran (rekomendasi/trending/favorit/lain-lain) ──
+  async function loadRows() {
+    const host = $('#homeRows');
+    if (!host) return;
+    host.innerHTML = '';
+    try {
+      const res = await Api.rows();
+      renderHomeRows(res.data || []);
+    } catch (e) {
+      renderHomeRows([]);
+    }
+  }
+
+  function renderHomeRows(rows) {
+    const host = $('#homeRows');
+    if (!host) return;
+    host.innerHTML = '';
+    if (!rows.length) return;
+    rows.forEach(row => host.appendChild(renderHomeRow(row)));
+  }
+
+  function renderHomeRow(row) {
+    const section = document.createElement('section');
+    section.className = 'home-row';
+    section.innerHTML = `
+      <div class="home-row-head">
+        <div class="home-row-title">
+          <span class="home-row-ico">${icon(row.icon || 'film', 15, 2.3)}</span>
+          <span>${escapeHtml(row.label)}</span>
+        </div>
+        <span class="home-row-count">${row.cards.length} judul</span>
+      </div>
+      <div class="home-row-strip"></div>
+    `;
+    const strip = section.querySelector('.home-row-strip');
+    row.cards.forEach(c => strip.appendChild(renderRowCard(c)));
+    return section;
+  }
+
+  function renderRowCard(item) {
+    const el = document.createElement('div');
+    el.className = 'row-card';
+    const title = item.name || item.title || '';
+    el.innerHTML = `
+      <div class="row-card-poster">
+        <img loading="lazy" decoding="async" src="${posterUrl(item.poster || item.poster_path)}"
+             alt="${escapeHtml(title)}" referrerpolicy="no-referrer"
+             onerror="this.onerror=null;this.src='/img/no-poster.svg'">
+        <span class="row-card-type">${icon(item.type === 'tv' ? 'tv' : 'film', 12, 2.3)}</span>
+        <span class="row-card-play"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg></span>
+      </div>
+      <div class="row-card-title">${escapeHtml(title)}</div>
+      <div class="row-card-sub">${escapeHtml(item.release ? String(item.release).slice(0, 4) : '—')} · ${item.type === 'tv' ? 'Serial' : 'Film'}</div>
+    `;
+    el.addEventListener('click', () => {
+      if ((item.type || 'movie') === 'tv') prefetchStream(item.id, 'tv', 1, 1);
+      else prefetchStream(item.id, 'movie');
+      openDetail(item.id, title, item.type || 'movie');
+    });
+    return el;
+  }
+
+  // ── Auto-slider generik (dot + geser sendiri + pause saat disentuh) ──
+  function setupAutoSlider(track, dotsHost, opts = {}) {
+    if (!track || !dotsHost) return null;
+    if (track.__slider && typeof track.__slider.destroy === 'function') track.__slider.destroy();
+    const slides = Array.from(track.children);
+    if (!slides.length) return null;
+
+    const dotClass = opts.dotClass || 'ad-carousel-dot';
+    const interval = opts.interval || 5200;
+    const loop = opts.loop !== false;
+    dotsHost.innerHTML = '';
+    const dots = slides.map((_, i) => {
+      const d = document.createElement('button');
+      d.type = 'button';
+      d.className = dotClass + (i === 0 ? ' active' : '');
+      d.setAttribute('aria-label', 'Slide ' + (i + 1));
+      d.addEventListener('click', () => { goTo(i); restart(); });
+      dotsHost.appendChild(d);
+      return d;
+    });
+
+    let idx = 0;
+    let timer = null;
+    let scrollGuard = null;
+    const handlers = [];
+
+    function setActive(i) {
+      idx = i;
+      dots.forEach((d, k) => d.classList.toggle('active', k === i));
+    }
+    function goTo(i, smooth = true) {
+      if (!slides.length) return;
+      if (!loop) i = Math.max(0, Math.min(slides.length - 1, i));
+      else i = (i + slides.length) % slides.length;
+      setActive(i);
+      const target = slides[i];
+      track.scrollTo({ left: target.offsetLeft - track.offsetLeft, behavior: smooth ? 'smooth' : 'auto' });
+    }
+    function restart() {
+      if (timer) clearInterval(timer);
+      if (slides.length < 2) return;
+      timer = setInterval(() => {
+        if (document.hidden || currentView !== 'home') return;
+        if (track.dataset.paused === '1') return;
+        goTo(idx + 1);
+      }, interval);
+    }
+
+    const onScroll = () => {
+      clearTimeout(scrollGuard);
+      scrollGuard = setTimeout(() => {
+        const center = track.scrollLeft + track.clientWidth / 2;
+        let best = 0, bestDist = Infinity;
+        slides.forEach((s, i) => {
+          const c = s.offsetLeft - track.offsetLeft + s.offsetWidth / 2;
+          const dd = Math.abs(c - center);
+          if (dd < bestDist) { bestDist = dd; best = i; }
+        });
+        setActive(best);
+      }, 90);
+    };
+    const pause = () => { track.dataset.paused = '1'; };
+    const resume = () => { track.dataset.paused = '0'; restart(); };
+
+    track.addEventListener('scroll', onScroll, { passive: true });
+    track.addEventListener('pointerdown', pause, { passive: true });
+    track.addEventListener('touchstart', pause, { passive: true });
+    track.addEventListener('pointerup', resume, { passive: true });
+    track.addEventListener('touchend', resume, { passive: true });
+    track.addEventListener('touchcancel', resume, { passive: true });
+    track.addEventListener('mouseenter', pause);
+    track.addEventListener('mouseleave', resume);
+    handlers.push(
+      ['scroll', onScroll], ['pointerdown', pause], ['touchstart', pause],
+      ['pointerup', resume], ['touchend', resume], ['touchcancel', resume],
+      ['mouseenter', pause], ['mouseleave', resume]
+    );
+
+    restart();
+    const api = {
+      goTo,
+      restart,
+      destroy() {
+        if (timer) clearInterval(timer);
+        clearTimeout(scrollGuard);
+        handlers.forEach(([ev, fn]) => track.removeEventListener(ev, fn));
+        track.__slider = null;
+      }
+    };
+    track.__slider = api;
+    return api;
   }
 
   // ── Carousel banner info (lapor bug + PlayMusic) ─────────
   function initAdCarousel() {
-    const track = $('#adCarouselTrack');
-    const dots = $('#adCarouselDots');
-    if (!track || !dots) return;
-    const slides = Array.from(track.children);
-    if (dots.dataset.ready === '1') return;
-    dots.dataset.ready = '1';
-    slides.forEach((_, i) => {
-      const dot = document.createElement('button');
-      dot.type = 'button';
-      dot.className = 'ad-carousel-dot' + (i === 0 ? ' active' : '');
-      dot.setAttribute('aria-label', 'Slide ' + (i + 1));
-      dot.addEventListener('click', () => {
-        slides[i].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-      });
-      dots.appendChild(dot);
+    setupAutoSlider($('#adCarouselTrack'), $('#adCarouselDots'), {
+      dotClass: 'ad-carousel-dot',
+      interval: 5600
     });
-    track.addEventListener('scroll', () => {
-      const idx = Math.round(track.scrollLeft / Math.max(1, track.clientWidth));
-      Array.from(dots.children).forEach((d, i) => d.classList.toggle('active', i === idx));
-    }, { passive: true });
   }
 
   async function loadBanner() {
@@ -456,37 +597,31 @@
       const card = document.createElement('div');
       card.className = 'banner-card';
       const title = m.name || m.title;
+      const kind = m.type === 'tv' ? 'Serial' : 'Film';
       card.innerHTML = `
         <img class="banner-bg" loading="lazy" src="${posterUrl(m.poster)}" alt="${escapeHtml(title)}"
              referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='/img/no-poster.svg'">
+        <span class="banner-shine" aria-hidden="true"></span>
         <div class="banner-play-icon">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
         </div>
         <div class="banner-overlay">
-          <span class="banner-tag">${i === 0 ? 'Pilihan Tim' : 'Trending'}</span>
+          <span class="banner-tag">
+            ${icon('flame', 12, 2.4)}
+            ${i === 0 ? 'Pilihan Tim' : 'Trending'}
+          </span>
           <div class="banner-title">${escapeHtml(title)}</div>
           <div class="banner-meta">
-            <span>${m.release || ''}</span>
-            <span>${m.type === 'tv' ? 'Serial' : 'Film'}</span>
+            ${m.release ? `<span class="banner-meta-item">${icon('calendar', 12, 2.3)} ${escapeHtml(m.release)}</span>` : ''}
+            <span class="banner-meta-item">${icon(m.type === 'tv' ? 'tv' : 'film', 12, 2.3)} ${kind}</span>
           </div>
         </div>
       `;
       card.addEventListener('click', () => openDetail(m.id, title, m.type || 'movie'));
       strip.appendChild(card);
-
-      const dot = document.createElement('button');
-      dot.className = 'banner-dot' + (i === 0 ? ' active' : '');
-      dot.setAttribute('aria-label', 'Slide ' + (i + 1));
-      dot.addEventListener('click', () => {
-        card.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-      });
-      dots.appendChild(dot);
     });
 
-    strip.addEventListener('scroll', () => {
-      const idx = Math.round(strip.scrollLeft / Math.max(1, (strip.firstElementChild?.offsetWidth || 300) + 16));
-      $$('.banner-dot').forEach((d, i) => d.classList.toggle('active', i === idx));
-    }, { passive: true });
+    setupAutoSlider(strip, dots, { dotClass: 'banner-dot', interval: 4600 });
   }
 
   // ── Detail ───────────────────────────────────────────────
@@ -1157,7 +1292,6 @@ async function loadEpisodes(id, season) {
     const d = watchState.detail || {};
     const title = d.title || d.name || watchState.title;
     $('#watchTitle').textContent = title || 'Tanpa Judul';
-    $('#miniTitle').textContent = title || 'Memutar...';
 
     const avatar = $('#watchAvatarImg');
     if (d.poster) {

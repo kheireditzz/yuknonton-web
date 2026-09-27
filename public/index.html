@@ -25,7 +25,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/neumorphic.css?v=1.8.0">
+  <link rel="stylesheet" href="/css/neumorphic.css?v=1.9.0">
   <!-- HLS.js untuk memutar stream m3u8 -->
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js"></script>
 </head>
@@ -69,17 +69,23 @@
       <!-- Carousel info: slide 1 lapor bug via WhatsApp, slide 2 PlayMusic -->
       <div class="ad-carousel">
         <div class="ad-carousel-track" id="adCarouselTrack">
-          <a class="ad-banner" id="adBanner" href="https://wa.me/62895321154498?text=Halo%20Admin%20YukNonton%2C%20saya%20ingin%20melaporkan%20bug%20pada%20website." target="_blank" rel="noopener">
+          <a class="ad-banner ad-banner-report" id="adBanner" href="https://wa.me/62895321154498?text=Halo%20Admin%20YukNonton%2C%20saya%20ingin%20melaporkan%20bug%20pada%20website." target="_blank" rel="noopener">
+            <span class="ad-banner-glow" aria-hidden="true"></span>
             <span class="ad-banner-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
                 <line x1="12" y1="8" x2="12" y2="12"></line>
                 <line x1="12" y1="16" x2="12.01" y2="16"></line>
               </svg>
             </span>
             <span class="ad-banner-body">
+              <span class="ad-banner-eyebrow">Dukungan Pengguna</span>
               <span class="ad-banner-title">Temukan bug atau kendala?</span>
-              <span class="ad-banner-desc">Laporkan langsung ke WhatsApp Admin — ketuk banner ini.</span>
+              <span class="ad-banner-desc">Laporkan langsung ke WhatsApp Admin — dibalas secepatnya.</span>
+              <span class="ad-banner-chips">
+                <span class="ad-chip">Respon cepat</span>
+                <span class="ad-chip">Gratis</span>
+              </span>
             </span>
             <span class="ad-banner-cta">
               Lapor Bug
@@ -88,16 +94,22 @@
           </a>
 
           <a class="ad-banner ad-banner-music" id="adMusicBanner" href="https://playmusic.kheireditz.my.id" target="_blank" rel="noopener">
+            <span class="ad-banner-glow" aria-hidden="true"></span>
             <span class="ad-banner-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M9 18V5l12-2v13"></path>
                 <circle cx="6" cy="18" r="3"></circle>
                 <circle cx="18" cy="16" r="3"></circle>
               </svg>
             </span>
             <span class="ad-banner-body">
-              <span class="ad-banner-title">Mau nonton dengan musik?</span>
-              <span class="ad-banner-desc">Kunjungi playmusic.kheireditz.my.id — ketuk untuk langsung membuka web.</span>
+              <span class="ad-banner-eyebrow">Musik &amp; Nonton</span>
+              <span class="ad-banner-title">Nonton ditemani musik?</span>
+              <span class="ad-banner-desc">Buka playmusic.kheireditz.my.id — koleksi musik siap menemani.</span>
+              <span class="ad-banner-chips">
+                <span class="ad-chip">Streaming</span>
+                <span class="ad-chip">Kualitas HD</span>
+              </span>
             </span>
             <span class="ad-banner-cta">
               Buka Web
@@ -160,6 +172,9 @@
           <span id="loadMoreLabel">Muat Lebih Banyak</span>
         </button>
       </div>
+
+      <!-- Baris campuran: rekomendasi / trending / favorit / lain-lain -->
+      <div id="homeRows" class="home-rows"></div>
     </div>
 
     <!-- Detail View -->
@@ -308,7 +323,7 @@
     YukNonton • Nonton film & serial viral • Data dari TMDB & vidlink.pro • Untuk edukasi semata
   </footer>
 
-  <script src="/js/api.js?v=1.8.0"></script>
-  <script src="/js/core.js?v=1.8.0"></script>
+  <script src="/js/api.js?v=1.9.0"></script>
+  <script src="/js/core.js?v=1.9.0"></script>
 </body>
 </html>

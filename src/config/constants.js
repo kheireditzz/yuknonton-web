@@ -19,6 +19,14 @@ export const SCRAPER = {
 // realtime=true → TTL pendek (update cepat, mis. tayang hari ini / on the air).
 export const CATALOG = [
   { id: 'trending',       label: 'Trending',        icon: 'trending',  paths: ['/movie', '/tv'],                          ttl: 300 },
+  // ── Film Indonesia (lengkap) — movie + serial, urut popularitas ──
+  { id: 'film-indonesia',      label: 'Film Indonesia',     icon: 'flag',   paths: ['/discover/movie?with_original_language=id&sort_by=popularity.desc'], ttl: 300, realtime: true },
+  { id: 'film-indonesia-new',  label: 'Indonesia Terbaru',  icon: 'zap',    paths: ['/discover/movie?with_original_language=id&sort_by=primary_release_date.desc'], ttl: 300, realtime: true },
+  { id: 'film-indonesia-top',  label: 'Indonesia Top',      icon: 'award',  paths: ['/discover/movie?with_original_language=id&sort_by=vote_average.desc&vote_count.gte=20'], ttl: 600 },
+  { id: 'serial-indonesia',    label: 'Serial Indonesia',   icon: 'tv',     paths: ['/discover/tv?with_original_language=id&sort_by=popularity.desc'], ttl: 300, realtime: true },
+  { id: 'indonesia-horor',     label: 'Horor Indonesia',    icon: 'ghost',  paths: ['/discover/movie?with_original_language=id&with_genres=27&sort_by=popularity.desc'], ttl: 600 },
+  { id: 'indonesia-komedi',    label: 'Komedi Indonesia',   icon: 'smile',  paths: ['/discover/movie?with_original_language=id&with_genres=35&sort_by=popularity.desc'], ttl: 600 },
+  { id: 'indonesia-drama',     label: 'Drama Indonesia',    icon: 'masks',  paths: ['/discover/movie?with_original_language=id&with_genres=18&sort_by=popularity.desc'], ttl: 600 },
   { id: 'serial-airing',  label: 'Serial Hari Ini', icon: 'broadcast', paths: ['/tv/airing-today'],                        ttl: 120, realtime: true },
   { id: 'serial-onair',   label: 'Sedang Tayang',   icon: 'signal',    paths: ['/tv/on-the-air'],                          ttl: 120, realtime: true },
   { id: 'anime',          label: 'Anime',           icon: 'sparkles',  paths: ['/keyword/210024-anime/tv', '/keyword/210024-anime/movie'], ttl: 600 },
@@ -52,6 +60,20 @@ export const CATALOG = [
 ];
 
 export const CATALOG_BY_ID = Object.fromEntries(CATALOG.map(c => [c.id, c]));
+
+// ── Home rows (baris campuran di bawah kategori) ──────────────────────────
+// Setiap baris menggabungkan beberapa kategori lalu diacak-merata (round-robin)
+// agar campuran film/serial/dari banyak sumber. `limit` = jumlah kartu.
+export const ROWS = [
+  { id: 'rekomendasi', label: 'Rekomendasi Untukmu', icon: 'sparkles', limit: 16, cats: ['trending', 'film-indonesia', 'film-now', 'serial-airing', 'anime'] },
+  { id: 'trending-now', label: 'Trending Hari Ini',   icon: 'trending', limit: 16, cats: ['trending', 'film-indonesia-new', 'serial-onair', 'anime-update'] },
+  { id: 'favorit',      label: 'Favorit Pengguna',    icon: 'heart',    limit: 16, cats: ['film-indonesia-top', 'film-top', 'serial-top', 'drama-korea'] },
+  { id: 'indonesia',    label: 'Indonesia Pilihan',   icon: 'flag',     limit: 16, cats: ['film-indonesia', 'serial-indonesia', 'indonesia-horor', 'indonesia-komedi', 'indonesia-drama'] },
+  { id: 'serial',       label: 'Serial Populer',      icon: 'tv',       limit: 14, cats: ['serial', 'serial-airing', 'serial-onair'] },
+  { id: 'anime',        label: 'Anime & Donghua',     icon: 'sparkles', limit: 14, cats: ['anime', 'anime-film', 'donghua', 'donghua-film'] },
+  { id: 'drama-asia',   label: 'Drama Asia',          icon: 'globe',    limit: 14, cats: ['drama-korea', 'drama-china', 'drama-jepang'] },
+  { id: 'malam',        label: 'Horor & Thriller',    icon: 'ghost',    limit: 14, cats: ['horor', 'thriller', 'misteri'] }
+];
 
 // TTL cache khusus katalog (ms). Cache service default tetap 5 menit.
 export const CATALOG_CACHE_TTL_MS = 10 * 60 * 1000;
