@@ -472,10 +472,6 @@
             <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
             ${playbackLabel}
           </button>
-          <button class="tactile-btn" onclick="window.__goHome()" id="backMainBtn">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
-            Beranda
-          </button>
         </div>
       </div>`;
 
@@ -640,7 +636,6 @@ async function loadEpisodes(id, season) {
 
   // ── Playback (Full Page Watch View) ──────────────────────
   async function playStream(id, type, season, episode, title) {
-    exitMini();
     showView('watch');
     resetPlayerUI(title);
 
@@ -713,8 +708,6 @@ try {
     $('#watchSub').innerHTML = '';
     $('#watchDesc').textContent = '';
     $('#watchMeta').innerHTML = '';
-    $('#watchDownloads').style.display = 'none';
-    $('#downloadGrid').innerHTML = '';
     $('#watchAvatarImg').src = '/img/no-poster.svg';
     $('#likeCount').textContent = '0';
     $('#dislikeCount').textContent = '0';
@@ -731,34 +724,60 @@ try {
       .filter(k => q[k])
       .sort((a, b) => parseInt(b, 10) - parseInt(a, 10));
     watchState.qualities = q;
-    renderDownloads();
-    if (!keys.length) {
-      watchState.qualityKey = null;
-      $('#qualityPicker').style.display = 'none';
-      return;
-    }
-    watchState.qualityKey = keys[0];
-    $('#qualityLabel').textContent = keys[0] + 'p';
+
     const menu = $('#qualityMenu');
     menu.innerHTML = '';
-    keys.forEach(k => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'quality-item' + (k === keys[0] ? ' active' : '');
-      b.textContent = k + 'p';
-      b.dataset.key = k;
-      b.addEventListener('click', () => selectQuality(k));
-      menu.appendChild(b);
-    });
+    $('#qualityLabel').textContent = 'Auto';
+
+    if (!keys.length && !stream.playlist) {
+      watchState.qualityKey = null;
+      menu.innerHTML = `<div class="quality-empty">Resolusi unduhan belum tersedia untuk judul ini.</div>`;
+      $('#qualityPicker').style.display = '';
+      return;
+    }
+
     if (stream.playlist) {
       const auto = document.createElement('button');
       auto.type = 'button';
-      auto.className = 'quality-item';
-      auto.textContent = 'Auto (HLS)';
+      auto.className = 'quality-item quality-play' + (keys.length ? '' : ' active');
       auto.dataset.key = 'auto';
+      auto.innerHTML = `<span class="quality-item-res">Auto</span><span class="quality-item-sub">HLS adaptif</span>`;
       auto.addEventListener('click', () => selectQuality('auto'));
       menu.appendChild(auto);
+      if (!keys.length) watchState.qualityKey = 'auto';
     }
+
+    keys.forEach((k, i) => {
+      const isDefault = !stream.playlist && i === 0;
+      const row = document.createElement('div');
+      row.className = 'quality-row';
+
+      const play = document.createElement('button');
+      play.type = 'button';
+      play.className = 'quality-item quality-play' + (isDefault ? ' active' : '');
+      play.dataset.key = k;
+      play.innerHTML = `<span class="quality-item-res">${escapeHtml(k)}p</span><span class="quality-item-sub">Putar</span>`;
+      play.addEventListener('click', () => selectQuality(k));
+      row.appendChild(play);
+
+      const dl = document.createElement('a');
+      dl.className = 'quality-dl';
+      dl.href = '/proxy/hls?url=' + encodeURIComponent(q[k]);
+      dl.setAttribute('download', '');
+      dl.target = '_blank';
+      dl.rel = 'noopener';
+      dl.title = `Unduh ${k}p`;
+      dl.setAttribute('aria-label', `Unduh ${k}p`);
+      dl.innerHTML = icon('download', 15, 2.3);
+      row.appendChild(dl);
+
+      menu.appendChild(row);
+    });
+
+    if (keys.length) {
+      watchState.qualityKey = stream.playlist ? 'auto' : keys[0];
+    }
+    $('#qualityLabel').textContent = watchState.qualityKey === 'auto' ? 'Auto' : watchState.qualityKey + 'p';
     $('#qualityPicker').style.display = '';
   }
 
@@ -891,27 +910,6 @@ try {
     $('#watchMeta').innerHTML = chips.map(c =>
       `<div class="fact-cell"><div class="fact-label">${escapeHtml(c.label)}</div><div class="fact-value">${escapeHtml(c.value)}</div></div>`
     ).join('');
-  }
-
-  // ── Resolusi & Unduhan ───────────────────────────────────
-  function renderDownloads() {
-    const box = $('#watchDownloads');
-    const grid = $('#downloadGrid');
-    const q = watchState.qualities || {};
-    const keys = Object.keys(q)
-      .filter(k => q[k])
-      .sort((a, b) => parseInt(b, 10) - parseInt(a, 10));
-    if (!keys.length) {
-      noteInto(grid, 'empty', 'Resolusi unduhan belum tersedia untuk judul ini.');
-      box.style.display = '';
-      return;
-    }
-    grid.innerHTML = keys.map(k => `
-      <a class="download-item" href="/proxy/hls?url=${encodeURIComponent(q[k])}" download target="_blank" rel="noopener">
-        <span class="dl-res">${escapeHtml(k)}p</span>
-        <span class="dl-ico">${icon('download', 15, 2.3)}</span>
-      </a>`).join('');
-    box.style.display = '';
   }
 
   // ── Likes ────────────────────────────────────────────────
@@ -1080,49 +1078,7 @@ try {
     return new Date(ts).toLocaleDateString('id-ID');
   }
 
-  // ── Fullscreen & Minimize ────────────────────────────────
-  function toggleFullscreen() {
-    const video = $('#playerVideo');
-    const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
-    if (fsEl) {
-      (document.exitFullscreen || document.webkitExitFullscreen).call(document);
-      return;
-    }
-    const fn = video.requestFullscreen || video.webkitRequestFullscreen || video.webkitEnterFullscreen;
-    if (fn) {
-      const r = fn.call(video);
-      if (r && r.catch) r.catch(() => showFeedback('info', 'Layar penuh tidak didukung pada browser ini.'));
-    } else {
-      showFeedback('info', 'Layar penuh tidak didukung pada browser ini.');
-    }
-  }
-
-  function updateFullscreenIcon() {
-    const fs = !!(document.fullscreenElement || document.webkitFullscreenElement);
-    const span = $('#playerFullscreenBtn')?.querySelector('span');
-    if (span) span.textContent = fs ? 'Keluar' : 'Layar Penuh';
-  }
-
-  function enterMini() {
-    const video = $('#playerVideo');
-    const slot = $('#miniVideoSlot');
-    slot.appendChild(video);
-    $('#miniPlayer').classList.add('open');
-    $('#miniTitle').textContent = $('#watchTitle').textContent || 'Memutar…';
-    showView('home');
-  }
-
-  function exitMini() {
-    const mini = $('#miniPlayer');
-    if (!mini.classList.contains('open')) return;
-    mini.classList.remove('open');
-    const video = $('#playerVideo');
-    const wrap = $('.watch-video-wrap');
-    if (wrap && video.parentElement !== wrap) wrap.insertBefore(video, wrap.firstChild);
-  }
-
-  function closePlayer() {
-    exitMini();
+function closePlayer() {
     closeQualityMenu();
     destroyHls();
     const v = $('#playerVideo');
@@ -1135,8 +1091,15 @@ try {
     showView('home');
   }
 
-  function toggleQualityMenu() { $('#qualityMenu').classList.toggle('open'); }
-  function closeQualityMenu() { $('#qualityMenu').classList.remove('open'); }
+  function toggleQualityMenu() {
+    const menu = $('#qualityMenu');
+    const open = menu.classList.toggle('open');
+    $('#qualityPicker').classList.toggle('menu-open', open);
+  }
+  function closeQualityMenu() {
+    $('#qualityMenu').classList.remove('open');
+    $('#qualityPicker').classList.remove('menu-open');
+  }
 
   // ── Events ───────────────────────────────────────────────
   function wireEvents() {
@@ -1161,13 +1124,6 @@ try {
     $('#loadMoreBtn').addEventListener('click', loadMore);
 
     $('#playerBackBtn').addEventListener('click', () => { closePlayer(); });
-    $('#playerFullscreenBtn').addEventListener('click', toggleFullscreen);
-    $('#playerMinimizeBtn').addEventListener('click', () => { enterMini(); });
-    $('#miniRestoreBtn').addEventListener('click', () => {
-      showView('watch');
-      exitMini();
-    });
-    $('#miniCloseBtn').addEventListener('click', closePlayer);
 
     $('#qualityToggle').addEventListener('click', (e) => {
       e.stopPropagation();
@@ -1190,14 +1146,10 @@ try {
       b.addEventListener('click', () => submitRating(Number(b.dataset.score)));
     });
 
-    document.addEventListener('fullscreenchange', updateFullscreenIcon);
-    document.addEventListener('webkitfullscreenchange', updateFullscreenIcon);
-
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         if ($('#qualityMenu').classList.contains('open')) { closeQualityMenu(); return; }
         if (currentView === 'watch') closePlayer();
-        else if ($('#miniPlayer').classList.contains('open')) closePlayer();
       }
     });
 

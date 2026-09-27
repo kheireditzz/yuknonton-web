@@ -25,7 +25,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/neumorphic.css?v=1.3.0">
+  <link rel="stylesheet" href="/css/neumorphic.css?v=1.5.0">
   <!-- HLS.js untuk memutar stream m3u8 -->
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js"></script>
 </head>
@@ -186,18 +186,9 @@
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
             </button>
           </div>
-
-          <!-- Pemilih resolusi menempel di sudut kanan atas video (di luar wrap agar menu tidak terpotong) -->
-          <div class="quality-picker watch-quality-overlay" id="qualityPicker" style="display:none;">
-            <button type="button" class="watch-quality-btn quality-toggle" id="qualityToggle" title="Pilih Resolusi" aria-label="Pilih Resolusi">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"></rect><path d="M17 2l-5 5-5-5"></path></svg>
-              <span id="qualityLabel">Auto</span>
-            </button>
-            <div class="quality-menu" id="qualityMenu"></div>
-          </div>
         </div>
 
-        <!-- Baris channel: pp + nama + durasi + tanggal rilis -->
+        <!-- Baris channel: pp + nama + durasi + tanggal rilis + dropdown resolusi/unduhan -->
         <div class="watch-channel">
           <div class="watch-channel-avatar" id="watchAvatar">
             <img id="watchAvatarImg" alt="" src="/img/no-poster.svg" referrerpolicy="no-referrer">
@@ -206,15 +197,16 @@
             <h1 class="watch-channel-name" id="watchTitle">Memuat...</h1>
             <div class="watch-channel-meta" id="watchSub"></div>
           </div>
-          <div class="watch-channel-actions">
-            <button type="button" class="watch-ctrl-btn" id="playerMinimizeBtn" title="Minimize" aria-label="Minimize Pemutar">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-              <span>Minimize</span>
+
+          <!-- Dropdown Resolusi & Unduhan -->
+          <div class="quality-picker watch-res-picker" id="qualityPicker" style="display:none;">
+            <button type="button" class="watch-res-toggle quality-toggle" id="qualityToggle" title="Resolusi & Unduhan" aria-label="Resolusi & Unduhan" aria-haspopup="true">
+              <svg class="watch-res-toggle-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"></rect><path d="M17 2l-5 5-5-5"></path></svg>
+              <span class="watch-res-toggle-text">Resolusi &amp; Unduhan</span>
+              <span class="watch-res-badge" id="qualityLabel">Auto</span>
+              <svg class="watch-res-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
             </button>
-            <button type="button" class="watch-ctrl-btn" id="playerFullscreenBtn" title="Layar Penuh" aria-label="Layar Penuh">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"></path><path d="M16 3h3a2 2 0 0 1 2 2v3"></path><path d="M8 21H5a2 2 0 0 1-2-2v-3"></path><path d="M16 21h3a2 2 0 0 0 2-2v-3"></path></svg>
-              <span>Layar Penuh</span>
-            </button>
+            <div class="quality-menu" id="qualityMenu" role="menu"></div>
           </div>
         </div>
 
@@ -234,12 +226,6 @@
         </div>
 
         <p class="watch-desc" id="watchDesc"></p>
-
-        <!-- Resolusi & Unduhan -->
-        <div class="watch-downloads" id="watchDownloads" style="display:none;">
-          <div class="overview-label">Resolusi & Unduhan</div>
-          <div class="download-grid" id="downloadGrid"></div>
-        </div>
 
         <div class="watch-meta-grid" id="watchMeta"></div>
 
@@ -288,31 +274,13 @@
       </div>
     </div>
 
-  </main>
-
-  <!-- Mini Player (melayang saat minimize) -->
-  <div class="mini-player" id="miniPlayer">
-    <div class="mini-frame">
-      <div class="mini-top">
-        <span class="mini-title" id="miniTitle">Memutar…</span>
-        <div class="mini-actions">
-          <button type="button" class="mini-btn" id="miniRestoreBtn" title="Perbesar" aria-label="Perbesar">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
-          </button>
-          <button type="button" class="mini-btn" id="miniCloseBtn" title="Tutup" aria-label="Tutup">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-          </button>
-        </div>
-      </div>
-      <div class="mini-video-slot" id="miniVideoSlot"></div>
-    </div>
-  </div>
+</main>
 
   <footer class="footer-note">
     YukNonton • Nonton film & serial viral • Data dari TMDB & vidlink.pro • Untuk edukasi semata
   </footer>
 
-  <script src="/js/api.js?v=1.3.0"></script>
-  <script src="/js/core.js?v=1.3.0"></script>
+  <script src="/js/api.js?v=1.5.0"></script>
+  <script src="/js/core.js?v=1.5.0"></script>
 </body>
 </html>
