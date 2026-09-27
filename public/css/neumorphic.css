@@ -1084,6 +1084,61 @@ body.watch-mode .footer-note { display: none; }
 }
 .watch-channel-meta .rating { color: var(--color-warning); font-weight: 700; }
 .watch-channel-meta .dot-sep { opacity: 0.5; }
+/* ── Strip episode di bawah nama film (nomor saja, bisa digeser) ── */
+.watch-episodes {
+  margin-top: 12px;
+  padding: 4px 2px 2px;
+}
+.watch-eps-scroll {
+  display: flex;
+  gap: 9px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 6px 2px 8px;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.watch-eps-scroll::-webkit-scrollbar { display: none; }
+.watch-ep-chip {
+  position: relative;
+  flex: 0 0 auto;
+  min-width: 46px;
+  height: 44px;
+  padding: 0 13px;
+  border: none;
+  border-radius: 12px;
+  background: var(--bg-surface);
+  color: var(--color-text);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  font-weight: 700;
+  box-shadow: var(--neu-extruded-sm);
+  cursor: pointer;
+  overflow: hidden;
+  scroll-snap-align: center;
+  transition: transform 0.14s ease, box-shadow 0.14s ease, color 0.14s ease;
+}
+.watch-ep-chip:active { transform: translateY(1px); box-shadow: var(--neu-inset); }
+.watch-ep-chip.active {
+  background: var(--color-primary);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(0,102,102,0.4);
+}
+.watch-ep-chip.done { color: var(--color-primary); }
+.watch-ep-chip.active.done { color: #fff; }
+.watch-ep-chip-num { position: relative; z-index: 2; }
+.watch-ep-chip-bar {
+  position: absolute;
+  left: 0; bottom: 0;
+  height: 3px;
+  width: 0;
+  background: var(--color-primary);
+  transition: width 0.25s ease;
+  z-index: 1;
+}
+.watch-ep-chip.active .watch-ep-chip-bar { background: rgba(255,255,255,0.9); }
+
 /* ── Watch Info ──────────────────────────────────────────── */
 .watch-actions {
   display: flex; align-items: center; gap: 10px;

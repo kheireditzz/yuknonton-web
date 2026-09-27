@@ -30,6 +30,44 @@
     myRating: 0
   };
 
+  // ── Race guard: token + abort per alur agar respons lama tidak menimpa UI baru ──
+  let watchSession = 0;
+  let watchAbort = null;
+  let detailReq = 0;
+  let detailAbort = null;
+  let episodeReq = 0;
+  let searchReq = 0;
+  let searchAbort = null;
+  let catalogReq = 0;
+  let catalogAbort = null;
+
+  function newAbortController() {
+    return typeof AbortController !== 'undefined' ? new AbortController() : null;
+  }
+  function signalOf(ctrl) {
+    return ctrl ? ctrl.signal : undefined;
+  }
+  function isAbort(err) {
+    return !!err && err.name === 'AbortError';
+  }
+
+  // Mulai sesi putar baru: batalkan request sesi sebelumnya, kembalikan token sesi.
+  function beginWatchSession() {
+    watchSession++;
+    if (watchAbort) { try { watchAbort.abort(); } catch (e) {} }
+    watchAbort = newAbortController();
+    return { token: watchSession, signal: signalOf(watchAbort) };
+  }
+  function isWatchActive(token) {
+    return token === watchSession;
+  }
+  // Tinggalkan watch view: batalkan semua request yang masih berjalan.
+  function abortWatchSession() {
+    watchSession++;
+    if (watchAbort) { try { watchAbort.abort(); } catch (e) {} }
+    watchAbort = null;
+  }
+
   // ── Icon System (SVG stroke, no emoji) ───────────────────
   const ICON_PATHS = {
     trending: '<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline>',
@@ -133,6 +171,8 @@
 
   // ── View Switching ───────────────────────────────────────
   function showView(name) {
+    // Keluar dari watch view → batalkan request stream yang masih berjalan
+    if (currentView === 'watch' && name !== 'watch') abortWatchSession();
     currentView = name;
     $('#homeView').style.display = name === 'home' ? '' : 'none';
     $('#detailView').classList.toggle('visible', name === 'detail');
@@ -241,12 +281,16 @@
   async function loadCatalog(catId) {
     renderSkeleton(10);
     stopRealtime();
+    if (catalogAbort) { try { catalogAbort.abort(); } catch (e) {} }
+    catalogAbort = newAbortController();
+    const token = ++catalogReq;
     catalogState.page = 1;
     catalogState.hasMore = true;
     seenKeys = new Set();
     beginLoading();
     try {
-      const res = await Api.catalog(catId, 1);
+      const res = await Api.catalog(catId, 1, signalOf(catalogAbort));
+      if (token !== catalogReq) return;
       const movies = res.data || [];
       const cat = categories.find(c => c.id === catId) || {};
       $('#sectionLabel').textContent = res.label || cat.label || 'Daftar';
@@ -263,6 +307,7 @@
 
       if (res.realtime) startRealtime(catId);
     } catch (err) {
+      if (isAbort(err) || token !== catalogReq) return;
       console.error(err);
       const grid = $('#moviesGrid');
       noteInto(grid, 'error', 'Gagal memuat katalog. Periksa koneksi internet lalu coba lagi.',
@@ -271,7 +316,7 @@
     } finally {
       endLoading();
     }
-    updateLoadMore();
+    if (token === catalogReq) updateLoadMore();
   }
 
   function appendCard(grid, m) {
@@ -284,6 +329,7 @@
   async function loadMore() {
     if (catalogState.loading || !catalogState.hasMore) return;
     catalogState.loading = true;
+    const token = catalogReq;
     const btn = $('#loadMoreBtn');
     const label = $('#loadMoreLabel');
     const prev = label.textContent;
@@ -291,7 +337,8 @@
     label.textContent = 'Memuat...';
     const next = catalogState.page + 1;
     try {
-      const res = await Api.catalog(activeCategory, next);
+      const res = await Api.catalog(activeCategory, next, signalOf(catalogAbort));
+      if (token !== catalogReq) return;
       const movies = res.data || [];
       const grid = $('#moviesGrid');
       const before = seenKeys.size;
@@ -303,13 +350,16 @@
         catalogState.hasMore = false;
       }
     } catch (err) {
+      if (isAbort(err) || token !== catalogReq) return;
       console.error(err);
       appendNote('#moviesGrid', 'error', 'Gagal memuat halaman berikutnya. Periksa koneksi lalu coba lagi.');
     } finally {
-      catalogState.loading = false;
-      btn.classList.remove('loading');
-      label.textContent = prev;
-      updateLoadMore();
+      if (token === catalogReq) {
+        catalogState.loading = false;
+        btn.classList.remove('loading');
+        label.textContent = prev;
+        updateLoadMore();
+      }
     }
   }
 
@@ -405,6 +455,10 @@
   let detailSelectedSeason = 1;
 
   async function openDetail(id, fallbackTitle, type) {
+    if (detailAbort) { try { detailAbort.abort(); } catch (e) {} }
+    detailAbort = newAbortController();
+    const token = ++detailReq;
+
     showView('detail');
     beginLoading();
     const hero = $('#detailHero');
@@ -417,10 +471,12 @@
       </div>`;
     $('#episodePicker').style.display = 'none';
     try {
-      const res = await Api.movie(id, type);
+      const res = await Api.movie(id, type, signalOf(detailAbort));
+      if (token !== detailReq) return;
       currentDetail = res.data;
       renderDetail(currentDetail);
     } catch (err) {
+      if (isAbort(err) || token !== detailReq) return;
       console.error(err);
       renderDetailFallback(id, fallbackTitle, type);
     } finally {
@@ -513,8 +569,10 @@
     box.style.display = '';
     $('#seasonTabs').innerHTML = '<span class="ep-hint">Memuat musim…</span>';
     $('#episodeList').innerHTML = '';
+    const token = detailReq;
     try {
-      const sres = await Api.tvSeasons(id);
+      const sres = await Api.tvSeasons(id, signalOf(detailAbort));
+      if (token !== detailReq) return;
       detailSeasons = sres.data || [];
       if (!detailSeasons.length) {
         box.style.display = 'none';
@@ -524,6 +582,7 @@
       renderSeasonTabs(id);
       loadEpisodes(id, detailSelectedSeason);
     } catch (e) {
+      if (isAbort(e) || token !== detailReq) return;
       box.style.display = 'none';
     }
   }
@@ -548,10 +607,12 @@
   }
 
 async function loadEpisodes(id, season) {
+    const token = ++episodeReq;
     const list = $('#episodeList');
     renderLoading(list, 'Memuat daftar episode...');
     try {
-      const res = await Api.tvEpisodes(id, season);
+      const res = await Api.tvEpisodes(id, season, signalOf(detailAbort));
+      if (token !== episodeReq) return;
       detailEpisodes = res.data || [];
       list.innerHTML = '';
       if (!detailEpisodes.length) {
@@ -574,6 +635,7 @@ async function loadEpisodes(id, season) {
         list.appendChild(el);
       });
     } catch (e) {
+      if (isAbort(e) || token !== episodeReq) return;
       noteInto(list, 'error', 'Gagal memuat daftar episode. Periksa koneksi lalu coba lagi.');
     }
   }
@@ -609,12 +671,16 @@ async function loadEpisodes(id, season) {
       return;
     }
     showView('search');
+    if (searchAbort) { try { searchAbort.abort(); } catch (e) {} }
+    searchAbort = newAbortController();
+    const token = ++searchReq;
     $('#searchResultTitle').textContent = 'Hasil untuk "' + q + '"';
     $('#searchEmpty').style.display = 'none';
     const grid = $('#searchResults');
     grid.innerHTML = renderSkeletonInto(8);
     beginLoading();
-    Api.search(q).then(res => {
+    Api.search(q, signalOf(searchAbort)).then(res => {
+      if (token !== searchReq) return;
       const items = res.data || [];
       $('#searchCount').textContent = items.length + ' hasil';
       grid.innerHTML = '';
@@ -623,7 +689,8 @@ async function loadEpisodes(id, season) {
         return;
       }
       items.forEach(m => grid.appendChild(renderMovieCard(m)));
-    }).catch(() => {
+    }).catch(err => {
+      if (isAbort(err) || token !== searchReq) return;
       noteInto(grid, 'error', 'Pencarian gagal. Periksa koneksi internet lalu coba lagi.');
     }).finally(endLoading);
   }
@@ -636,6 +703,15 @@ async function loadEpisodes(id, season) {
 
   // ── Playback (Full Page Watch View) ──────────────────────
   async function playStream(id, type, season, episode, title) {
+    // Mulai sesi baru; request sesi lama langsung dibatalkan agar beban hilang
+    // dan respons terlambat tidak menimpa judul yang baru dipilih.
+    const session = beginWatchSession();
+    const token = session.token;
+    const signal = session.signal;
+
+    // Simpan progres episode yang sedang berjalan sebelum pindah judul/episode
+    setWatchProgress();
+
     showView('watch');
     resetPlayerUI(title);
 
@@ -651,24 +727,34 @@ async function loadEpisodes(id, season) {
     watchState.myVote = 0;
     watchState.myRating = 0;
 
-    Api.movie(id, type).then(res => {
+    Api.movie(id, type, signal).then(res => {
+      if (!isWatchActive(token)) return;
       watchState.detail = res.data || null;
       renderWatchInfo();
     }).catch(() => {});
 
-    loadLikes(id);
-    loadComments(id);
-    loadRating(id);
+    loadLikes(id, token, signal);
+    loadComments(id, token, signal);
+    loadRating(id, token, signal);
 
-try {
-      const res = await Api.play(id, type, season, episode);
+    if (watchState.type === 'tv' && season) {
+      renderEpisodeStrip(id, season, episode, token, signal);
+    } else {
+      $('#watchEpisodes').style.display = 'none';
+      episodeStripData = { id: null, season: null, episodes: [] };
+    }
+
+    try {
+      const res = await Api.play(id, type, season, episode, signal);
+      if (!isWatchActive(token)) return;
       const stream = res.playlist || {};
       watchState.stream = stream;
       if (!stream.mp4 && !stream.playlist) throw new Error('Tidak ada stream');
       $('#playerStatus').textContent = 'Menemukan sumber stream. Memutar...';
       setupQualities(stream);
-      initPlayer(stream);
+      initPlayer(stream, false, token);
     } catch (err) {
+      if (isAbort(err) || !isWatchActive(token)) return;
       console.error(err);
       $('#playerStatus').style.display = 'none';
       const errBox = $('#playerError');
@@ -716,6 +802,9 @@ try {
     renderLoading('#commentList', 'Memuat komentar...');
     closeQualityMenu();
     $('#qualityPicker').style.display = 'none';
+    $('#watchEpisodes').style.display = 'none';
+    $('#watchEpsScroll').innerHTML = '';
+    episodeStripData = { id: null, season: null, episodes: [] };
   }
 
   function setupQualities(stream) {
@@ -803,19 +892,21 @@ try {
       return;
     }
     if (k === 'auto' && stream.playlist) {
-      initPlayer(stream, true);
+      initPlayer(stream, true, watchSession);
     }
   }
 
-  function initPlayer(stream, forceHls) {
+  function initPlayer(stream, forceHls, token) {
+    const stale = () => token !== undefined && !isWatchActive(token);
     destroyHls();
     const video = $('#playerVideo');
     const mp4 = stream.mp4;
 
     if (mp4 && !forceHls) {
       video.src = '/proxy/hls?url=' + encodeURIComponent(mp4);
-      video.addEventListener('loadeddata', () => { $('#playerStatus').style.display = 'none'; }, { once: true });
+      video.addEventListener('loadeddata', () => { if (!stale()) $('#playerStatus').style.display = 'none'; }, { once: true });
       video.play().catch((e) => {
+        if (stale()) return;
         $('#playerStatus').style.display = 'none';
         $('#playerError').style.display = '';
         $('#playerError').innerHTML = playerErrorHtml(
@@ -844,10 +935,12 @@ try {
       hls.loadSource('/proxy/hls?url=' + encodeURIComponent(playlistUrl));
       hls.attachMedia(video);
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        if (stale()) return;
         $('#playerStatus').style.display = 'none';
         video.play().catch(() => {});
       });
       hls.on(Hls.Events.ERROR, (evt, data) => {
+        if (stale()) return;
         if (data.fatal) {
           if (data.type === Hls.ErrorTypes.NETWORK_ERROR) { hls.startLoad(); }
           else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) { hls.recoverMediaError(); }
@@ -863,7 +956,7 @@ try {
       });
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
       video.src = '/proxy/hls?url=' + encodeURIComponent(playlistUrl);
-      video.addEventListener('loadeddata', () => { $('#playerStatus').style.display = 'none'; }, { once: true });
+      video.addEventListener('loadeddata', () => { if (!stale()) $('#playerStatus').style.display = 'none'; }, { once: true });
       video.play().catch(() => {});
     } else {
       $('#playerError').style.display = '';
@@ -878,7 +971,101 @@ try {
     if (hls) { try { hls.destroy(); } catch (e) {} hls = null; }
   }
 
-// ── Watch Info ───────────────────────────────────────────
+// ── Episode Strip + progres tontonan (disimpan di localStorage) ──
+  const PROGRESS_KEY = 'yn_progress_v1';
+  let episodeStripData = { id: null, season: null, episodes: [] };
+  const episodeCache = new Map();
+
+  function loadProgressStore() {
+    try { return JSON.parse(localStorage.getItem(PROGRESS_KEY)) || {}; } catch (e) { return {}; }
+  }
+  function saveProgressStore(store) {
+    try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(store)); } catch (e) {}
+  }
+  function progressKey(id, season, episode) { return id + ':' + season + ':' + episode; }
+  function getProgressRatio(id, season, episode) {
+    const rec = loadProgressStore()[progressKey(id, season, episode)];
+    return rec && typeof rec.r === 'number' ? rec.r : 0;
+  }
+  function setWatchProgress() {
+    if (watchState.type !== 'tv' || !watchState.id || !watchState.season || !watchState.episode) return;
+    const video = $('#playerVideo');
+    const dur = video.duration;
+    if (!dur || !isFinite(dur) || dur <= 0) return;
+    const ratio = Math.max(0, Math.min(1, video.currentTime / dur));
+    const store = loadProgressStore();
+    store[progressKey(watchState.id, watchState.season, watchState.episode)] = {
+      r: ratio, t: video.currentTime, d: dur, at: Date.now()
+    };
+    saveProgressStore(store);
+  }
+
+  function updateEpisodeBars() {
+    $$('#watchEpsScroll .watch-ep-chip').forEach(chip => {
+      const ep = Number(chip.dataset.ep);
+      const ratio = getProgressRatio(episodeStripData.id, episodeStripData.season, ep);
+      const bar = chip.querySelector('.watch-ep-chip-bar');
+      if (bar) bar.style.width = Math.round(ratio * 100) + '%';
+      chip.classList.toggle('done', ratio >= 0.98);
+    });
+  }
+
+  function scrollActiveEpisodeIntoView() {
+    const active = $('#watchEpsScroll .watch-ep-chip.active');
+    if (active && active.scrollIntoView) {
+      active.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    }
+  }
+
+  function stripTitleFor(ep) {
+    const base = (watchState.detail && (watchState.detail.title || watchState.detail.name)) || watchState.title || '';
+    const clean = String(base).replace(/\s*—\s*S\d+E\d+\s*$/, '').trim();
+    return (clean || 'Episode') + ' — S' + watchState.season + 'E' + ep;
+  }
+
+  async function renderEpisodeStrip(id, season, episode, token, signal) {
+    const wrap = $('#watchEpisodes');
+    const scroll = $('#watchEpsScroll');
+    wrap.style.display = '';
+
+    const cacheKey = id + ':' + season;
+    let eps = episodeCache.get(cacheKey);
+    if (!eps) {
+      scroll.innerHTML = '<span class="ep-hint">Memuat episode...</span>';
+      try {
+        const res = await Api.tvEpisodes(id, season, signal);
+        if (!isWatchActive(token)) return;
+        eps = res.data || [];
+        episodeCache.set(cacheKey, eps);
+      } catch (e) {
+        if (isAbort(e) || !isWatchActive(token)) return;
+        wrap.style.display = 'none';
+        return;
+      }
+    }
+    if (!isWatchActive(token)) return;
+
+    episodeStripData = { id, season, episodes: eps };
+    if (!eps.length) { wrap.style.display = 'none'; return; }
+    scroll.innerHTML = '';
+    eps.forEach(ep => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'watch-ep-chip' + (Number(ep.episode) === Number(episode) ? ' active' : '');
+      chip.dataset.ep = ep.episode;
+      chip.title = 'Episode ' + ep.episode;
+      chip.innerHTML = `<span class="watch-ep-chip-num">${ep.episode}</span><span class="watch-ep-chip-bar"></span>`;
+      chip.addEventListener('click', () => {
+        if (Number(ep.episode) === Number(watchState.episode)) return;
+        playStream(id, 'tv', season, ep.episode, stripTitleFor(ep.episode));
+      });
+      scroll.appendChild(chip);
+    });
+    updateEpisodeBars();
+    scrollActiveEpisodeIntoView();
+  }
+
+  // ── Watch Info ───────────────────────────────────────────
   function renderWatchInfo() {
     const d = watchState.detail || {};
     const title = d.title || d.name || watchState.title;
@@ -913,8 +1100,9 @@ try {
   }
 
   // ── Likes ────────────────────────────────────────────────
-  function loadLikes(id) {
-    Api.likes(id).then(res => {
+  function loadLikes(id, token, signal) {
+    Api.likes(id, signal).then(res => {
+      if (!isWatchActive(token)) return;
       watchState.likes = { likes: res.likes || 0, dislikes: res.dislikes || 0 };
       renderLikes();
     }).catch(() => {});
@@ -956,8 +1144,9 @@ try {
   }
 
   // ── Rating Poll ──────────────────────────────────────────
-  function loadRating(id) {
-    Api.ratings(id).then(res => {
+  function loadRating(id, token, signal) {
+    Api.ratings(id, signal).then(res => {
+      if (!isWatchActive(token)) return;
       watchState.rating = res;
       renderRating();
     }).catch(() => {});
@@ -1011,9 +1200,13 @@ try {
   }
 
   // ── Comments ─────────────────────────────────────────────
-  function loadComments(id) {
+  function loadComments(id, token, signal) {
     renderLoading('#commentList', 'Memuat komentar...');
-    Api.comments(id).then(renderComments).catch(() => {
+    Api.comments(id, signal).then(res => {
+      if (!isWatchActive(token)) return;
+      renderComments(res);
+    }).catch(err => {
+      if (isAbort(err) || !isWatchActive(token)) return;
       noteInto('#commentList', 'error', 'Gagal memuat komentar. Periksa koneksi lalu coba lagi.');
     });
   }
@@ -1079,6 +1272,7 @@ try {
   }
 
 function closePlayer() {
+    setWatchProgress();
     closeQualityMenu();
     destroyHls();
     const v = $('#playerVideo');
@@ -1124,6 +1318,19 @@ function closePlayer() {
     $('#loadMoreBtn').addEventListener('click', loadMore);
 
     $('#playerBackBtn').addEventListener('click', () => { closePlayer(); });
+
+    // Progres tontonan untuk strip episode (throttle 4s + saat jeda/selesai)
+    let lastProgressSave = 0;
+    const playerVideo = $('#playerVideo');
+    playerVideo.addEventListener('timeupdate', () => {
+      const now = Date.now();
+      if (now - lastProgressSave < 4000) return;
+      lastProgressSave = now;
+      setWatchProgress();
+      updateEpisodeBars();
+    });
+    playerVideo.addEventListener('pause', () => { setWatchProgress(); updateEpisodeBars(); });
+    playerVideo.addEventListener('ended', () => { setWatchProgress(); updateEpisodeBars(); });
 
     $('#qualityToggle').addEventListener('click', (e) => {
       e.stopPropagation();
