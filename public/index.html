@@ -6,7 +6,8 @@
   <meta name="referrer" content="no-referrer">
   <title>YukNonton - Platform Nonton Film Viral</title>
   <meta name="description" content="YukNonton - Platform nonton film & serial viral mancanegara dan lokal dengan desain tactile neumorphism.">
-  <meta name="theme-color" content="#006666">
+  <meta name="theme-color" content="#E7E5E4">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <link rel="icon" type="image/svg+xml" href="/img/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon-32.png">
   <link rel="icon" type="image/png" sizes="96x96" href="/img/favicon-96.png">
@@ -24,7 +25,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/neumorphic.css?v=1.1.0">
+  <link rel="stylesheet" href="/css/neumorphic.css?v=1.3.0">
   <!-- HLS.js untuk memutar stream m3u8 -->
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js"></script>
 </head>
@@ -58,16 +59,32 @@
     </div>
   </header>
 
-  <!-- Toast -->
-  <div class="neu-toast" id="neuToast" role="alert" aria-live="polite">
-    <div class="neu-toast-dot"></div>
-    <span id="toastMsg"></span>
-  </div>
+  <!-- Loading bar global (pengganti notifikasi) -->
+  <div class="loading-bar" id="loadingBar" role="progressbar" aria-label="Memuat"><span></span></div>
 
   <main class="container">
 
     <!-- Dashboard (Home) -->
     <div id="homeView">
+      <!-- Banner iklan: lapor bug via WhatsApp -->
+      <a class="ad-banner" id="adBanner" href="https://wa.me/62895321154498?text=Halo%20Admin%20YukNonton%2C%20saya%20ingin%20melaporkan%20bug%20pada%20website." target="_blank" rel="noopener">
+        <span class="ad-banner-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+        </span>
+        <span class="ad-banner-body">
+          <span class="ad-banner-title">Temukan bug atau kendala?</span>
+          <span class="ad-banner-desc">Laporkan langsung ke WhatsApp Admin — ketuk banner ini.</span>
+        </span>
+        <span class="ad-banner-cta">
+          Lapor Bug
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+        </span>
+      </a>
+
       <!-- Trending Banner -->
       <div class="trending-banner">
         <div class="banner-strip" id="bannerStrip"></div>
@@ -88,7 +105,10 @@
 
         <!-- Kategori Tabs -->
         <div class="filter-tabs" id="filterTabs">
-          <button type="button" class="neu-tab-btn active" data-cat="trending">🔥 Trending</button>
+          <button type="button" class="neu-tab-btn active" data-cat="trending">
+            <span class="tab-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg></span>
+            <span class="tab-label">Trending</span>
+          </button>
         </div>
       </div>
 
@@ -152,32 +172,41 @@
       <div class="search-hero-hint" id="searchEmpty">Ketik judul untuk mulai mencari.</div>
     </div>
 
-    <!-- Watch View (Full Page Player) -->
+<!-- Watch View (Full Page Player) -->
     <div id="watchView" class="watch-view">
-      <!-- Baris 1: video naik ke atas -->
-      <div class="watch-stage" id="watchStage">
-        <div class="watch-video-wrap">
-          <video id="playerVideo" class="player-video" controls autoplay playsinline webkit-playsinline poster=""></video>
-          <div id="playerStatus" class="player-loading">Menghubungi server streaming…</div>
-          <div id="playerError" class="player-error" style="display:none;"></div>
-        </div>
+      <section class="watch-card">
+        <div class="watch-stage" id="watchStage">
+          <div class="watch-video-wrap">
+            <video id="playerVideo" class="player-video" controls autoplay playsinline webkit-playsinline poster=""></video>
+            <div id="playerStatus" class="player-loading">Menghubungi server streaming...</div>
+            <div id="playerError" class="player-error" style="display:none;"></div>
 
-        <!-- Kontrol bar: kembali, resolusi, minimize, layar penuh -->
-        <div class="watch-controls" id="watchControls">
-          <div class="watch-controls-left">
-            <button type="button" class="watch-ctrl-btn" id="playerBackBtn" title="Kembali" aria-label="Kembali">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
-              <span>Kembali</span>
+            <!-- Tombol kembali menempel di sudut kiri atas video -->
+            <button type="button" class="watch-back-overlay" id="playerBackBtn" title="Kembali" aria-label="Kembali">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
             </button>
           </div>
-          <div class="watch-controls-right">
-            <div class="quality-picker" id="qualityPicker" style="display:none;">
-              <button type="button" class="watch-ctrl-btn quality-toggle" id="qualityToggle" title="Pilih Resolusi" aria-label="Pilih Resolusi">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"></rect><path d="M17 2l-5 5-5-5"></path></svg>
-                <span id="qualityLabel">Auto</span>
-              </button>
-              <div class="quality-menu" id="qualityMenu"></div>
-            </div>
+
+          <!-- Pemilih resolusi menempel di sudut kanan atas video (di luar wrap agar menu tidak terpotong) -->
+          <div class="quality-picker watch-quality-overlay" id="qualityPicker" style="display:none;">
+            <button type="button" class="watch-quality-btn quality-toggle" id="qualityToggle" title="Pilih Resolusi" aria-label="Pilih Resolusi">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"></rect><path d="M17 2l-5 5-5-5"></path></svg>
+              <span id="qualityLabel">Auto</span>
+            </button>
+            <div class="quality-menu" id="qualityMenu"></div>
+          </div>
+        </div>
+
+        <!-- Baris channel: pp + nama + durasi + tanggal rilis -->
+        <div class="watch-channel">
+          <div class="watch-channel-avatar" id="watchAvatar">
+            <img id="watchAvatarImg" alt="" src="/img/no-poster.svg" referrerpolicy="no-referrer">
+          </div>
+          <div class="watch-channel-main">
+            <h1 class="watch-channel-name" id="watchTitle">Memuat...</h1>
+            <div class="watch-channel-meta" id="watchSub"></div>
+          </div>
+          <div class="watch-channel-actions">
             <button type="button" class="watch-ctrl-btn" id="playerMinimizeBtn" title="Minimize" aria-label="Minimize Pemutar">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
               <span>Minimize</span>
@@ -187,14 +216,6 @@
               <span>Layar Penuh</span>
             </button>
           </div>
-        </div>
-      </div>
-
-      <!-- Baris 2: judul, aksi, deskripsi singkat -->
-      <div class="watch-info">
-        <div class="watch-info-head">
-          <h1 class="watch-title" id="watchTitle">Memuat…</h1>
-          <div class="watch-sub" id="watchSub"></div>
         </div>
 
         <div class="watch-actions">
@@ -214,6 +235,12 @@
 
         <p class="watch-desc" id="watchDesc"></p>
 
+        <!-- Resolusi & Unduhan -->
+        <div class="watch-downloads" id="watchDownloads" style="display:none;">
+          <div class="overview-label">Resolusi & Unduhan</div>
+          <div class="download-grid" id="downloadGrid"></div>
+        </div>
+
         <div class="watch-meta-grid" id="watchMeta"></div>
 
         <!-- Poll Rating Pengguna -->
@@ -222,20 +249,23 @@
             <div class="overview-label" style="margin:0;">Poll Rating Pengguna</div>
             <div class="rating-summary">
               <span class="rating-avg" id="ratingAvg">0.0</span>
-              <span class="rating-avg-stars" id="ratingAvgStars">☆☆☆☆☆</span>
+              <span class="rating-avg-stars" id="ratingAvgStars" aria-hidden="true"></span>
               <span class="rating-total" id="ratingTotal">0 suara</span>
             </div>
           </div>
           <div class="rating-stars" id="ratingStars" role="radiogroup" aria-label="Beri rating">
-            <button type="button" class="star-btn" data-score="1" aria-label="1 bintang">★</button>
-            <button type="button" class="star-btn" data-score="2" aria-label="2 bintang">★</button>
-            <button type="button" class="star-btn" data-score="3" aria-label="3 bintang">★</button>
-            <button type="button" class="star-btn" data-score="4" aria-label="4 bintang">★</button>
-            <button type="button" class="star-btn" data-score="5" aria-label="5 bintang">★</button>
+            <button type="button" class="star-btn" data-score="1" aria-label="1 bintang"></button>
+            <button type="button" class="star-btn" data-score="2" aria-label="2 bintang"></button>
+            <button type="button" class="star-btn" data-score="3" aria-label="3 bintang"></button>
+            <button type="button" class="star-btn" data-score="4" aria-label="4 bintang"></button>
+            <button type="button" class="star-btn" data-score="5" aria-label="5 bintang"></button>
           </div>
           <div class="rating-bars" id="ratingBars"></div>
         </div>
-      </div>
+
+        <!-- Umpan balik aksi (inline, bukan notifikasi) -->
+        <div class="watch-feedback" id="watchFeedback" style="display:none;"></div>
+      </section>
 
       <!-- Baris 3: komentar -->
       <div class="watch-comments" id="watchComments">
@@ -282,7 +312,7 @@
     YukNonton • Nonton film & serial viral • Data dari TMDB & vidlink.pro • Untuk edukasi semata
   </footer>
 
-  <script src="/js/api.js?v=1.1.0"></script>
-  <script src="/js/core.js?v=1.1.0"></script>
+  <script src="/js/api.js?v=1.3.0"></script>
+  <script src="/js/core.js?v=1.3.0"></script>
 </body>
 </html>
