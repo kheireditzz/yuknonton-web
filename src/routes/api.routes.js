@@ -183,9 +183,14 @@ export async function handleApiRoute(req, res, pathname, parsedUrl) {
       ? `stream_tv_${id}_s${season || 1}_e${episode || 1}`
       : `stream_movie_${id}`;
 
+    // Cache di edge CDN Vercel (s-maxage) agar lintas instance tetap cepat.
+    const edgeCache = 'public, s-maxage=300, stale-while-revalidate=86400';
+
     const cached = getFromCache(cacheKey, STREAM_CACHE_TTL_MS);
     if (cached) {
-      res.writeHead(200, { 'X-Stream-Cache': 'hit' });
+      res.setHeader('Cache-Control', edgeCache);
+      res.setHeader('X-Stream-Cache', 'hit');
+      res.writeHead(200);
       res.end(JSON.stringify({ id, type, playlist: cached, season, episode }));
       return;
     }
@@ -200,13 +205,16 @@ export async function handleApiRoute(req, res, pathname, parsedUrl) {
       const playlist = await pending;
 
       if (!playlist) {
+        res.setHeader('Cache-Control', 'no-store');
         res.writeHead(404);
         res.end(JSON.stringify({ error: 'Stream not found for this media', id, type }));
         return;
       }
 
       setCache(cacheKey, playlist, STREAM_CACHE_TTL_MS);
-      res.writeHead(200, { 'X-Stream-Cache': 'miss' });
+      res.setHeader('Cache-Control', edgeCache);
+      res.setHeader('X-Stream-Cache', 'miss');
+      res.writeHead(200);
       res.end(JSON.stringify({ id, type, playlist, season, episode }));
     } catch (err) {
       res.writeHead(500);
