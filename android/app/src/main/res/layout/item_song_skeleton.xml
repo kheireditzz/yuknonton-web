@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="70dp"
+    android:layout_marginHorizontal="14dp"
+    android:layout_marginVertical="5dp"
+    android:background="@drawable/neu_skeleton_card"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingHorizontal="12dp">
+
+    <!-- Album Art Placeholder -->
+    <View
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:background="@drawable/neu_skeleton_item" />
+
+    <!-- Text Bars Placeholder -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="14dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <View
+            android:layout_width="160dp"
+            android:layout_height="13dp"
+            android:background="@drawable/neu_skeleton_item" />
+
+        <View
+            android:layout_width="95dp"
+            android:layout_height="10dp"
+            android:layout_marginTop="7dp"
+            android:background="@drawable/neu_skeleton_item" />
+    </LinearLayout>
+
+    <!-- Play Button Circle Placeholder -->
+    <View
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:background="@drawable/neu_skeleton_item" />
+
+</LinearLayout>

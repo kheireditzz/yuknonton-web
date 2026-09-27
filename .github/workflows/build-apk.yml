@@ -1,0 +1,101 @@
+name: Build & Release Android APK
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Production Signed APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Accept Android SDK Licenses
+        run: yes | sdkmanager --licenses || true
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.5'
+
+      - name: Ensure Keystore Exists
+        run: |
+          if [ ! -f android/app/release.p12 ]; then
+            echo "Generating production release keystore..."
+            keytool -genkeypair -v -keystore android/app/release.p12 -storetype PKCS12 -alias yuknonton -keyalg RSA -keysize 2048 -validity 10000 -storepass "yuknonton123" -keypass "yuknonton123" -dname "CN=YukNonton, OU=Kheireditz, O=Kheireditz, L=Jakarta, ST=Jakarta, C=ID"
+          fi
+          ls -la android/app/release.p12
+
+      - name: Build Release APK with Gradle
+        run: |
+          cd android
+          gradle assembleRelease --no-daemon --stacktrace
+
+      - name: Prepare APK Release Artifacts
+        run: |
+          mkdir -p release-output
+          APK_PATH=$(find android/app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          if [ -z "$APK_PATH" ]; then
+            echo "Error: Release APK not found!"
+            exit 1
+          fi
+          echo "Found APK at $APK_PATH"
+          cp "$APK_PATH" release-output/yuknonton-release.apk
+          cp "$APK_PATH" release-output/yuknonton-v1.0.0.apk
+          cd release-output
+          sha256sum yuknonton-release.apk > yuknonton-release.apk.sha256
+          ls -lh
+
+      - name: Upload APK Artifact to GitHub Actions
+        uses: actions/upload-artifact@v4
+        with:
+          name: yuknonton-v1.0.0-production-apk
+          path: release-output/*
+
+      - name: Publish to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
+        with:
+          tag_name: v1.0.0
+          name: "YukNonton v1.0.0 (Android APK)"
+          body: |
+            ### 🎬 YukNonton v1.0.0 — Android APK (Production)
+
+            Rilis resmi aplikasi Android **YukNonton** — nonton film & serial viral langsung dari HP.
+            Menggunakan WebView native yang ringan dan cepat, dengan streaming HLS/MP4 adaptif.
+
+            #### 🌟 Fitur:
+            - **Streaming HLS/MP4 adaptif** dengan pemilih resolusi & unduhan.
+            - **Katalog lengkap** — termasuk Film Indonesia lengkap, anime, donghua, drama Asia.
+            - **Baris rekomendasi & trending** campuran dengan slide otomatis.
+            - **Rating, like, dan komentar** pengguna.
+            - **Unduhan native** lewat Android DownloadManager.
+            - **Pembaruan in-app** tanpa perlu uninstal.
+
+            Aplikasi ditandatangani dengan keystore produksi tetap (*persistent release signature*),
+            sehingga pembaruan versi mendatang dapat langsung dipasang tanpa uninstal.
+
+            #### 📥 Cara Pasang / Update:
+            1. Unduh file **`yuknonton-release.apk`** di bawah ini.
+            2. Buka file APK di HP Android Anda, lalu pilih **Install** (atau **Update** jika sudah terpasang).
+            3. Aplikasi siap digunakan!
+          files: |
+            release-output/yuknonton-release.apk
+            release-output/yuknonton-v1.0.0.apk
+            release-output/yuknonton-release.apk.sha256

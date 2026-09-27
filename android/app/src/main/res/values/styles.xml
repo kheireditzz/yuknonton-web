@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.YukNonton" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="colorPrimary">@color/primary_teal</item>
+        <item name="colorPrimaryDark">@color/neu_bg</item>
+        <item name="colorAccent">@color/primary_teal</item>
+        <item name="android:windowBackground">@color/neu_bg</item>
+        <item name="android:statusBarColor">@color/neu_bg</item>
+        <item name="android:navigationBarColor">@color/neu_bg</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="windowNoTitle">true</item>
+        <item name="windowActionBar">false</item>
+    </style>
+</resources>
