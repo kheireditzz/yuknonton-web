@@ -149,102 +149,91 @@ header.neu-header {
   100% { left: 100%; }
 }
 
-/* ── Ad banner (lapor bug + musik) ───────────────────────── */
+/* ── Ad banner (lapor bug + musik) — gaya seragam banner film ── */
 .ad-banner {
   position: relative;
-  display: flex; align-items: center; gap: 16px;
-  background:
-    linear-gradient(135deg, rgba(255,255,255,0.55), rgba(255,255,255,0) 45%),
-    var(--bg-surface);
-  border-radius: 22px;
-  padding: 18px 20px;
-  margin: 2px 0 20px;
+  display: block;
+  border-radius: 20px;
+  height: 200px;
+  overflow: hidden;
   box-shadow: var(--neu-extruded-card);
   text-decoration: none;
-  color: var(--color-text);
-  overflow: hidden;
-  isolation: isolate;
-  transition: transform 0.2s cubic-bezier(0.16,1,0.3,1), box-shadow 0.2s ease;
+  color: #fff;
+  cursor: pointer;
+  background: var(--color-primary);
+  transition: transform 0.25s cubic-bezier(0.16,1,0.3,1), box-shadow 0.25s ease;
 }
-.ad-banner::before {
-  content: '';
-  position: absolute; left: 0; top: 0; bottom: 0;
-  width: 5px; z-index: 3;
-  background: linear-gradient(180deg, var(--color-primary), var(--color-primary-light));
+.ad-banner:hover { transform: translateY(-4px); box-shadow: var(--neu-extruded-lg); }
+.ad-banner:active { transform: translateY(0); box-shadow: var(--neu-inset); }
+
+/* Latar bergaya (bukan foto) — samakan nuansa dengan banner film */
+.ad-banner-bg {
+  position: absolute; inset: 0; z-index: 0;
+  background:
+    radial-gradient(120% 120% at 15% 10%, rgba(255,255,255,0.22), rgba(255,255,255,0) 45%),
+    linear-gradient(135deg, var(--color-primary-light), var(--color-primary) 55%, #003d3d);
 }
-.ad-banner:hover { transform: translateY(-3px); box-shadow: var(--neu-extruded-lg); }
-.ad-banner:active { box-shadow: var(--neu-inset); transform: translateY(0); }
-.ad-banner-glow {
-  position: absolute; z-index: 0;
-  width: 190px; height: 190px; border-radius: 50%;
-  right: -60px; top: -70px;
-  background: radial-gradient(circle, rgba(0,102,102,0.28), rgba(0,102,102,0) 70%);
+.ad-banner-music .ad-banner-bg {
+  background:
+    radial-gradient(120% 120% at 15% 10%, rgba(255,255,255,0.2), rgba(255,255,255,0) 45%),
+    linear-gradient(135deg, #A63248, var(--color-ciak) 55%, #4d1220);
+}
+.ad-banner-shine {
+  position: absolute; inset: 0; z-index: 1;
+  background: linear-gradient(115deg, transparent 35%, rgba(255,255,255,0.3) 50%, transparent 65%);
+  transform: translateX(-120%);
   pointer-events: none;
 }
-.ad-banner-icon {
-  position: relative; z-index: 2;
-  width: 54px; height: 54px; border-radius: 17px; flex-shrink: 0;
-  background: linear-gradient(145deg, var(--color-primary-light), var(--color-primary));
-  color: #fff;
+.ad-banner:hover .ad-banner-shine { animation: bannerShine 1.1s ease; }
+.ad-banner::after {
+  content: '';
+  position: absolute; inset: 0; z-index: 1;
+  background: linear-gradient(180deg, rgba(16,20,24,0) 22%, rgba(16,20,24,0.9) 100%);
+}
+/* Aksi bulat kanan atas — sama seperti tombol play banner film */
+.ad-banner-action {
+  position: absolute; top: 14px; right: 14px; z-index: 3;
+  width: 44px; height: 44px; border-radius: 50%;
+  background: rgba(0,102,102,0.55);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255,255,255,0.35);
   display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 10px 22px rgba(0,102,102,0.42), inset 0 1px 0 rgba(255,255,255,0.35);
-}
-.ad-banner-body { position: relative; z-index: 2; flex: 1; min-width: 0; }
-.ad-banner-eyebrow {
-  display: block;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.62rem; font-weight: 700;
-  letter-spacing: 0.12em; text-transform: uppercase;
-  color: var(--color-primary);
-  margin-bottom: 3px;
-}
-.ad-banner-title {
-  display: block;
-  font-family: 'Space Mono', monospace;
-  font-size: 1rem; font-weight: 700;
-  letter-spacing: -0.01em;
-  color: var(--color-text);
-}
-.ad-banner-desc {
-  display: block;
-  margin-top: 4px;
-  font-size: 0.8rem; color: var(--color-text-muted);
-  line-height: 1.45;
-}
-.ad-banner-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-.ad-chip {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.62rem; font-weight: 700;
-  color: var(--color-primary);
-  background: rgba(0,102,102,0.1);
-  padding: 4px 9px; border-radius: 999px;
-}
-.ad-banner-cta {
-  position: relative; z-index: 2;
-  display: inline-flex; align-items: center; gap: 7px;
-  flex-shrink: 0;
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 0.8rem; font-weight: 800;
   color: #fff;
-  background: var(--color-primary);
-  padding: 12px 18px; border-radius: 14px;
-  box-shadow: 0 10px 22px rgba(0,102,102,0.4);
-  white-space: nowrap;
-  transition: transform 0.18s ease, background 0.18s ease;
 }
-.ad-banner-cta svg { transition: transform 0.2s ease; }
-.ad-banner:hover .ad-banner-cta svg { transform: translateX(3px); }
-.ad-banner:active .ad-banner-cta { transform: scale(0.97); }
+.ad-banner-music .ad-banner-action { background: rgba(122,30,46,0.55); }
 
-/* Varian musik (tema ciak coklat) */
-.ad-banner-music::before { background: linear-gradient(180deg, var(--color-ciak), #A63248); }
-.ad-banner-music .ad-banner-glow { background: radial-gradient(circle, rgba(122,30,46,0.26), rgba(122,30,46,0) 70%); }
-.ad-banner-music .ad-banner-icon { background: linear-gradient(145deg, #A63248, var(--color-ciak)); box-shadow: 0 10px 22px rgba(122,30,46,0.4), inset 0 1px 0 rgba(255,255,255,0.3); }
-.ad-banner-music .ad-banner-eyebrow { color: var(--color-ciak); }
-.ad-banner-music .ad-chip { color: var(--color-ciak); background: rgba(122,30,46,0.1); }
-.ad-banner-music .ad-banner-cta { background: var(--color-ciak); box-shadow: 0 10px 22px rgba(122,30,46,0.4); }
-.ad-banner-music:hover .ad-banner-cta { background: #A63248; }
-
+.ad-banner-overlay {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 2;
+  padding: 16px 18px;
+  display: flex; flex-direction: column; align-items: flex-start;
+}
+.ad-banner-tag {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.66rem; letter-spacing: 0.06em; font-weight: 700;
+  text-transform: uppercase;
+  color: #33E6DE;
+  background: rgba(0,102,102,0.36);
+  border: 1px solid rgba(51,230,222,0.28);
+  padding: 5px 10px; border-radius: 8px;
+  margin-bottom: 9px;
+  backdrop-filter: blur(6px);
+}
+.ad-banner-music .ad-banner-tag { color: #FFC2CE; background: rgba(122,30,46,0.4); border-color: rgba(255,194,206,0.3); }
+.ad-banner-title {
+  color: #fff; font-weight: 800; font-size: 1.22rem;
+  line-height: 1.25; text-shadow: 0 2px 12px rgba(0,0,0,0.5);
+}
+.ad-banner-meta {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  margin-top: 7px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.74rem; color: #d7e3e3;
+}
+.ad-banner-meta-item { display: inline-flex; align-items: center; gap: 4px; }
+.ad-banner-meta-item + .ad-banner-meta-item::before {
+  content: '•'; margin-right: 8px; opacity: 0.6;
+}
 /* ── Carousel banner info (lapor bug + PlayMusic) ────────── */
 .ad-carousel { margin: 2px 0 22px; }
 .ad-carousel-track {
@@ -272,11 +261,8 @@ header.neu-header {
   transition: all 0.3s cubic-bezier(0.16,1,0.3,1);
 }
 .ad-carousel-dot.active { width: 26px; background: var(--color-primary); }
-@media (max-width: 560px) {
-  .ad-banner { flex-wrap: wrap; gap: 12px; padding: 16px; }
-  .ad-banner-icon { width: 48px; height: 48px; }
-  .ad-banner-cta { width: 100%; justify-content: center; margin-top: 2px; }
-}
+@media (min-width: 640px) { .ad-banner { height: 230px; } }
+@media (min-width: 960px) { .ad-banner { height: 260px; } }
 
 /* ── Inline note (info/error/empty/loading) ──────────────── */
 .inline-note {
