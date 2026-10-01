@@ -180,10 +180,13 @@
     return wrap;
   }
 
-  // ── View Switching ───────────────────────────────────────
+  let returnView = 'home';
   function showView(name) {
     // Keluar dari watch view → batalkan request stream yang masih berjalan
     if (currentView === 'watch' && name !== 'watch') abortWatchSession();
+    if (name === 'watch' && currentView !== 'watch') {
+      returnView = (currentView === 'detail' || !currentView) ? 'home' : currentView;
+    }
     currentView = name;
     $('#homeView').style.display = name === 'home' ? '' : 'none';
     $('#detailView').classList.toggle('visible', name === 'detail');
@@ -245,10 +248,11 @@
     `;
     el.addEventListener('click', () => {
       const targetType = isAnichin ? 'anichin' : (item.type || 'movie');
-      // Prefetch lebih awal agar stream siap saat tombol putar ditekan
-      if (targetType === 'tv' || targetType === 'anichin') prefetchStream(item.id, targetType, 1, 1);
-      else prefetchStream(item.id, 'movie');
-      openDetail(item.id, title, targetType);
+      if (targetType === 'tv' || targetType === 'anichin') {
+        playStream(item.id, targetType, 1, 1, title);
+      } else {
+        playStream(item.id, 'movie', null, null, title);
+      }
     });
     return el;
   }
@@ -484,9 +488,11 @@
     `;
     el.addEventListener('click', () => {
       const targetType = isAnichin ? 'anichin' : (item.type || 'movie');
-      if (targetType === 'tv' || targetType === 'anichin') prefetchStream(item.id, targetType, 1, 1);
-      else prefetchStream(item.id, 'movie');
-      openDetail(item.id, title, targetType);
+      if (targetType === 'tv' || targetType === 'anichin') {
+        playStream(item.id, targetType, 1, 1, title);
+      } else {
+        playStream(item.id, 'movie', null, null, title);
+      }
     });
     return el;
   }
@@ -630,7 +636,15 @@
           </div>
         </div>
       `;
-      card.addEventListener('click', () => openDetail(m.id, title, m.type || 'movie'));
+      card.addEventListener('click', () => {
+        const isAnichin = m.provider === 'anichin' || m.type === 'anichin' || String(m.id).startsWith('anichin:');
+        const targetType = isAnichin ? 'anichin' : (m.type || 'movie');
+        if (targetType === 'tv' || targetType === 'anichin') {
+          playStream(m.id, targetType, 1, 1, title);
+        } else {
+          playStream(m.id, 'movie', null, null, title);
+        }
+      });
       strip.appendChild(card);
     });
 
@@ -1477,7 +1491,7 @@
     watchState.id = null;
     watchState.myVote = 0;
     watchState.myRating = 0;
-    showView('home');
+    showView(returnView || 'home');
   }
 
   function toggleQualityMenu() {
