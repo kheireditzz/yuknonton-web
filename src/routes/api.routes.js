@@ -2,6 +2,7 @@ import { scrapeHome, scrapeMovieDetail, scrapeTvDetail, scrapeSearch, scrapeSeas
 import { getFromCache, setCache } from '../services/cache.service.js';
 import { listCategories, getCatalog, getRows } from '../services/catalog.service.js';
 import { resolveMovieStream, resolveTvStream } from '../services/vidlink.service.js';
+import { getAnichinCatalog, searchAnichin, getAnichinDetail, resolveAnichinStream } from '../services/anichin.service.js';
 import { getComments, addComment, getLikes, applyLikeDelta, getRating, applyRating } from '../services/interactions.service.js';
 import { STREAM_CACHE_TTL_MS } from '../config/constants.js';
 
@@ -82,6 +83,51 @@ export async function handleApiRoute(req, res, pathname, parsedUrl) {
     return;
   }
 
+  // ── ANICHIN DEDICATED ROUTES ──
+  if (pathname === '/api/anichin/catalog') {
+    const mode = parsedUrl.searchParams.get('mode') || 'latest';
+    const page = Number(parsedUrl.searchParams.get('page') || '1') || 1;
+    const cards = await getAnichinCatalog(mode, page);
+    res.writeHead(200);
+    res.end(JSON.stringify({ mode, page, count: cards.length, data: cards }));
+    return;
+  }
+
+  if (pathname === '/api/anichin/search') {
+    const q = (parsedUrl.searchParams.get('q') || '').trim();
+    const page = Number(parsedUrl.searchParams.get('page') || '1') || 1;
+    const cards = await searchAnichin(q, page);
+    res.writeHead(200);
+    res.end(JSON.stringify({ query: q, page, count: cards.length, data: cards }));
+    return;
+  }
+
+  if (pathname === '/api/anichin/detail') {
+    const slug = parsedUrl.searchParams.get('slug') || '';
+    if (!slug) {
+      res.writeHead(400);
+      res.end(JSON.stringify({ error: 'slug parameter is required' }));
+      return;
+    }
+    const data = await getAnichinDetail(slug);
+    res.writeHead(200);
+    res.end(JSON.stringify({ data }));
+    return;
+  }
+
+  if (pathname === '/api/anichin/play') {
+    const ep = parsedUrl.searchParams.get('episode') || '';
+    if (!ep) {
+      res.writeHead(400);
+      res.end(JSON.stringify({ error: 'episode parameter is required' }));
+      return;
+    }
+    const data = await resolveAnichinStream(ep);
+    res.writeHead(200);
+    res.end(JSON.stringify({ data }));
+    return;
+  }
+
   // ── SEARCH ──
   if (pathname === '/api/search') {
     const q = (parsedUrl.searchParams.get('q') || '').trim();
@@ -97,15 +143,19 @@ export async function handleApiRoute(req, res, pathname, parsedUrl) {
       res.end(JSON.stringify({ query: q, cached: true, count: cached.length, data: cached }));
       return;
     }
-    const results = await scrapeSearch(q);
+    const [anichinResults, tmdbResults] = await Promise.all([
+      searchAnichin(q).catch(() => []),
+      scrapeSearch(q).catch(() => [])
+    ]);
+    const results = [...anichinResults, ...tmdbResults];
     if (results.length > 0) setCache(key, results);
     res.writeHead(200);
     res.end(JSON.stringify({ query: q, cached: false, count: results.length, data: results }));
     return;
   }
 
-  // ── MOVIE / TV DETAIL ──
-  if (pathname === '/api/movie' || pathname === '/api/tv') {
+  // ── MOVIE / TV / ANICHIN DETAIL ──
+  if (pathname === '/api/movie' || pathname === '/api/tv' || pathname === '/api/detail') {
     const id = parsedUrl.searchParams.get('id');
     const type = pathname === '/api/tv' ? 'tv' : (parsedUrl.searchParams.get('type') || 'movie');
     if (!id) {
@@ -113,6 +163,19 @@ export async function handleApiRoute(req, res, pathname, parsedUrl) {
       res.end(JSON.stringify({ error: 'id parameter is required' }));
       return;
     }
+
+    if (id.startsWith('anichin:') || type === 'anichin') {
+      try {
+        const detail = await getAnichinDetail(id);
+        res.writeHead(200);
+        res.end(JSON.stringify({ cached: false, data: detail }));
+      } catch (err) {
+        res.writeHead(404);
+        res.end(JSON.stringify({ error: 'Donghua not found', id, message: err.message }));
+      }
+      return;
+    }
+
     const key = (type === 'tv' ? 'tv_' : 'movie_') + id;
     const cached = getFromCache(key);
     if (cached) {
@@ -142,6 +205,27 @@ export async function handleApiRoute(req, res, pathname, parsedUrl) {
       res.end(JSON.stringify({ error: 'id parameter is required' }));
       return;
     }
+    if (id.startsWith('anichin:')) {
+      try {
+        const detail = await getAnichinDetail(id);
+        res.writeHead(200);
+        res.end(JSON.stringify({
+          cached: false,
+          data: [{
+            season: 1,
+            season_number: 1,
+            name: 'Semua Episode Sub Indo',
+            episodes: detail.episodes_count || detail.episodes?.length || 0,
+            episode_count: detail.episodes_count || detail.episodes?.length || 0
+          }]
+        }));
+      } catch (err) {
+        res.writeHead(404);
+        res.end(JSON.stringify({ error: 'Donghua not found', message: err.message }));
+      }
+      return;
+    }
+
     const key = 'seasons_' + id;
     const cached = getFromCache(key);
     if (cached) {
@@ -165,6 +249,18 @@ export async function handleApiRoute(req, res, pathname, parsedUrl) {
       res.end(JSON.stringify({ error: 'id parameter is required' }));
       return;
     }
+    if (id.startsWith('anichin:')) {
+      try {
+        const detail = await getAnichinDetail(id);
+        res.writeHead(200);
+        res.end(JSON.stringify({ cached: false, data: detail.episodes || [] }));
+      } catch (err) {
+        res.writeHead(404);
+        res.end(JSON.stringify({ error: 'Episodes not found', message: err.message }));
+      }
+      return;
+    }
+
     const key = `episodes_${id}_s${season}`;
     const cached = getFromCache(key);
     if (cached) {
@@ -189,6 +285,51 @@ export async function handleApiRoute(req, res, pathname, parsedUrl) {
     if (!id) {
       res.writeHead(400);
       res.end(JSON.stringify({ error: 'id parameter is required' }));
+      return;
+    }
+
+    // Special Anichin handling
+    if (id.startsWith('anichin:') || type === 'anichin') {
+      try {
+        let targetEpSlug = episode;
+        // If episode param is empty, an index, or number, find slug from detail
+        if (!targetEpSlug || /^\d+$/.test(String(targetEpSlug).trim())) {
+          const detail = await getAnichinDetail(id);
+          const epNum = targetEpSlug ? parseInt(targetEpSlug, 10) : 1;
+          const matched = (detail.episodes || []).find(e => e.episode_number === epNum) || detail.episodes?.[0];
+          targetEpSlug = matched ? matched.slug : id.replace(/^anichin:/, '');
+        }
+
+        const stream = await resolveAnichinStream(targetEpSlug);
+        if (!stream) {
+          res.setHeader('Cache-Control', 'no-store');
+          res.writeHead(404);
+          res.end(JSON.stringify({ error: 'Stream not found for this donghua', id }));
+          return;
+        }
+
+        res.setHeader('Cache-Control', 'public, max-age=300');
+        res.writeHead(200);
+        res.end(JSON.stringify({
+          id,
+          type: 'anichin',
+          playlist: {
+            source: 'anichin',
+            playlist: stream.playlist,
+            mp4: stream.mp4,
+            qualities: stream.qualities || {},
+            mirrors: stream.mirrors || [],
+            embed: stream.embed || null,
+            captions: []
+          },
+          season: 1,
+          episode: targetEpSlug
+        }));
+      } catch (err) {
+        console.error('[Anichin] Stream error:', err);
+        res.writeHead(500);
+        res.end(JSON.stringify({ error: 'Failed to resolve Anichin stream', message: err.message }));
+      }
       return;
     }
 

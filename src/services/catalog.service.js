@@ -1,5 +1,6 @@
 import { CATALOG, CATALOG_BY_ID, ROWS } from '../config/constants.js';
 import { scrapeCatalog } from './tmdb.service.js';
+import { getAnichinCatalog } from './anichin.service.js';
 
 const cache = new Map();
 const rowsCache = new Map();
@@ -30,8 +31,17 @@ async function loadCategory(cat, page = 1) {
     return { ...hit.value, cached: true, category: cat.id, realtime: !!cat.realtime };
   }
 
-  const paths = cat.paths.map(p => addPage(p, page));
-  let items = await scrapeCatalog(paths).catch(() => []);
+  let items = [];
+  if (cat.provider === 'anichin') {
+    items = await getAnichinCatalog(cat.mode || 'latest', page).catch(async (err) => {
+      console.warn('[Catalog] Anichin error, falling back to TMDB paths:', err.message);
+      const paths = (cat.paths || []).map(p => addPage(p, page));
+      return scrapeCatalog(paths).catch(() => []);
+    });
+  } else {
+    const paths = (cat.paths || []).map(p => addPage(p, page));
+    items = await scrapeCatalog(paths).catch(() => []);
+  }
 
   const value = { category: cat.id, label: cat.label, page, cards: items };
   cache.set(key, { ts: Date.now(), value });

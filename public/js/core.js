@@ -215,10 +215,18 @@
     const el = document.createElement('div');
     el.className = 'movie-card';
     const title = item.name || item.title || '';
+    const isAnichin = item.provider === 'anichin' || item.type === 'anichin' || String(item.id).startsWith('anichin:');
+    const badgeTypeHtml = isAnichin
+      ? `<span class="movie-type-badge anichin">${icon('sparkles', 11, 2)} ${escapeHtml(item.badge || 'Donghua')}</span>`
+      : `<span class="movie-type-badge">${icon(item.type === 'tv' ? 'tv' : 'film', 13, 2.3)}</span>`;
+    const metaSub = isAnichin
+      ? (item.badge || 'Donghua Sub Indo')
+      : (item.type === 'tv' ? 'Serial' : 'Film');
+
     el.innerHTML = `
       <div class="movie-poster-wrap">
         ${item.rating ? `<span class="movie-rating">${icon('star', 11, 2)} ${Number(item.rating).toFixed(1)}</span>` : ''}
-        <span class="movie-type-badge">${icon(item.type === 'tv' ? 'tv' : 'film', 13, 2.3)}</span>
+        ${badgeTypeHtml}
         <img class="movie-poster" loading="lazy" decoding="async"
              src="${posterUrl(item.poster || item.poster_path)}"
              alt="${escapeHtml(title)}"
@@ -232,14 +240,15 @@
       <div class="movie-meta">
         <span>${escapeHtml(item.release ? String(item.release).slice(0, 4) : '—')}</span>
         <span class="dot"></span>
-        <span>${item.type === 'tv' ? 'Serial' : 'Film'}</span>
+        <span>${escapeHtml(metaSub)}</span>
       </div>
     `;
     el.addEventListener('click', () => {
+      const targetType = isAnichin ? 'anichin' : (item.type || 'movie');
       // Prefetch lebih awal agar stream siap saat tombol putar ditekan
-      if ((item.type || 'movie') === 'tv') prefetchStream(item.id, 'tv', 1, 1);
+      if (targetType === 'tv' || targetType === 'anichin') prefetchStream(item.id, targetType, 1, 1);
       else prefetchStream(item.id, 'movie');
-      openDetail(item.id, title, item.type || 'movie');
+      openDetail(item.id, title, targetType);
     });
     return el;
   }
@@ -459,21 +468,25 @@
     const el = document.createElement('div');
     el.className = 'row-card';
     const title = item.name || item.title || '';
+    const isAnichin = item.provider === 'anichin' || item.type === 'anichin' || String(item.id).startsWith('anichin:');
+    const typeLabel = isAnichin ? 'Donghua' : (item.type === 'tv' ? 'Serial' : 'Film');
+    const typeIco = isAnichin ? 'sparkles' : (item.type === 'tv' ? 'tv' : 'film');
     el.innerHTML = `
       <div class="row-card-poster">
         <img loading="lazy" decoding="async" src="${posterUrl(item.poster || item.poster_path)}"
              alt="${escapeHtml(title)}" referrerpolicy="no-referrer"
              onerror="this.onerror=null;this.src='/img/no-poster.svg'">
-        <span class="row-card-type">${icon(item.type === 'tv' ? 'tv' : 'film', 12, 2.3)}</span>
+        <span class="row-card-type">${icon(typeIco, 12, 2.3)}</span>
         <span class="row-card-play"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg></span>
       </div>
       <div class="row-card-title">${escapeHtml(title)}</div>
-      <div class="row-card-sub">${escapeHtml(item.release ? String(item.release).slice(0, 4) : '—')} · ${item.type === 'tv' ? 'Serial' : 'Film'}</div>
+      <div class="row-card-sub">${escapeHtml(item.release ? String(item.release).slice(0, 4) : '—')} · ${escapeHtml(typeLabel)}</div>
     `;
     el.addEventListener('click', () => {
-      if ((item.type || 'movie') === 'tv') prefetchStream(item.id, 'tv', 1, 1);
+      const targetType = isAnichin ? 'anichin' : (item.type || 'movie');
+      if (targetType === 'tv' || targetType === 'anichin') prefetchStream(item.id, targetType, 1, 1);
       else prefetchStream(item.id, 'movie');
-      openDetail(item.id, title, item.type || 'movie');
+      openDetail(item.id, title, targetType);
     });
     return el;
   }
@@ -679,8 +692,13 @@
   }
 
   function renderDetail(d) {
-    const isTv = d.type === 'tv';
-    const playbackLabel = isTv ? 'Nonton S1 E1' : 'Putar Film';
+    const isAnichin = d.type === 'anichin' || String(d.id).startsWith('anichin:');
+    const isTv = d.type === 'tv' || isAnichin || (d.episodes && d.episodes.length > 0);
+    const playbackLabel = isAnichin ? 'Putar Episode 1' : (isTv ? 'Nonton S1 E1' : 'Putar Film');
+    const badgeTypeHtml = isAnichin
+      ? `<span class="meta-ico">${icon('sparkles', 13, 2.3)} Donghua Sub Indo</span>`
+      : (isTv ? `<span class="meta-ico">${icon('tv', 13, 2.3)} Serial</span>` : '');
+
     $('#detailHero').innerHTML = `
       ${d.backdrop ? `<img class="detail-backdrop" src="${d.backdrop}" alt="" referrerpolicy="no-referrer"
          onerror="this.onerror=null;this.style.display='none'">` : ''}
@@ -696,7 +714,7 @@
           ${d.release ? `<span>${escapeHtml(d.release)}</span>` : ''}
           ${d.duration ? `<span>•</span><span>${escapeHtml(d.duration)}</span>` : ''}
           ${d.rating ? `<span class="rating">${icon('star', 12, 2.3)} ${Number(d.rating).toFixed(1)}</span>` : ''}
-          ${isTv ? `<span>•</span><span class="meta-ico">${icon('tv', 13, 2.3)} Serial</span>` : ''}
+          ${badgeTypeHtml ? `<span>•</span>${badgeTypeHtml}` : ''}
         </div>
         <div class="detail-actions">
           <button class="tactile-btn primary" id="playMainBtn">
@@ -730,20 +748,21 @@
       `<div class="fact-cell"><div class="fact-label">${p.label}</div><div class="fact-value">${p.value}</div></div>`
     ).join('');
 
+    const playType = isAnichin ? 'anichin' : (isTv ? 'tv' : 'movie');
     // Prefetch sumber stream saat detail dibuka → putar jadi instan
-    if (isTv) prefetchStream(d.id, 'tv', detailSelectedSeason || 1, 1);
+    if (isTv) prefetchStream(d.id, playType, detailSelectedSeason || 1, 1);
     else prefetchStream(d.id, 'movie');
 
     $('#playMainBtn').addEventListener('click', () => {
-      if (isTv) playStream(d.id, 'tv', detailSelectedSeason || 1, 1, d.title);
+      if (isTv) playStream(d.id, playType, detailSelectedSeason || 1, 1, d.title);
       else playStream(d.id, 'movie', null, null, d.title);
     });
 
-    if (isTv) loadEpisodePicker(d.id);
+    if (isTv) loadEpisodePicker(d.id, playType);
     else $('#episodePicker').style.display = 'none';
   }
 
-  async function loadEpisodePicker(id) {
+  async function loadEpisodePicker(id, playType = 'tv') {
     const box = $('#episodePicker');
     box.style.display = '';
     $('#seasonTabs').innerHTML = '<span class="ep-hint">Memuat musim…</span>';
@@ -757,36 +776,35 @@
         box.style.display = 'none';
         return;
       }
-      detailSelectedSeason = detailSeasons[0].season;
-      renderSeasonTabs(id);
-      loadEpisodes(id, detailSelectedSeason);
+      detailSelectedSeason = detailSeasons[0].season || 1;
+      renderSeasonTabs(id, playType);
+      loadEpisodes(id, detailSelectedSeason, playType);
     } catch (e) {
       if (isAbort(e) || token !== detailReq) return;
       box.style.display = 'none';
     }
   }
 
-  function renderSeasonTabs(id) {
+  function renderSeasonTabs(id, playType = 'tv') {
     const tabs = $('#seasonTabs');
     tabs.innerHTML = '';
     detailSeasons.forEach(s => {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'season-tab' + (s.season === detailSelectedSeason ? ' active' : '');
-      b.textContent = 'S' + s.season + (s.episodes ? ` (${s.episodes})` : '');
+      b.textContent = s.name ? `${s.name} (${s.episodes})` : ('S' + s.season + (s.episodes ? ` (${s.episodes})` : ''));
       b.dataset.s = s.season;
       b.addEventListener('click', () => {
         detailSelectedSeason = s.season;
         $$('#seasonTabs .season-tab').forEach(x => x.classList.toggle('active', Number(x.dataset.s) === s.season));
-        loadEpisodes(id, s.season);
-        prefetchStream(id, 'tv', s.season, 1);
+        loadEpisodes(id, s.season, playType);
+        prefetchStream(id, playType, s.season, 1);
       });
-      b.dataset.s = s.season;
       tabs.appendChild(b);
     });
   }
 
-async function loadEpisodes(id, season) {
+  async function loadEpisodes(id, season, playType = 'tv') {
     const token = ++episodeReq;
     const list = $('#episodeList');
     renderLoading(list, 'Memuat daftar episode...');
@@ -796,21 +814,24 @@ async function loadEpisodes(id, season) {
       detailEpisodes = res.data || [];
       list.innerHTML = '';
       if (!detailEpisodes.length) {
-        noteInto(list, 'empty', 'Belum ada episode untuk musim ini.');
+        noteInto(list, 'empty', 'Belum ada episode untuk judul ini.');
         return;
       }
       detailEpisodes.forEach(ep => {
         const el = document.createElement('button');
         el.type = 'button';
         el.className = 'episode-item';
+        const epNum = ep.episode || ep.episode_number || 1;
         el.innerHTML = `
-          <span class="episode-num">E${ep.episode}</span>
+          <span class="episode-num">E${epNum}</span>
           <span class="episode-info">
-            <span class="episode-name">${escapeHtml(ep.name || 'Episode ' + ep.episode)}</span>
+            <span class="episode-name">${escapeHtml(ep.name || 'Episode ' + epNum)}</span>
             ${ep.overview ? `<span class="episode-ov">${escapeHtml(ep.overview)}</span>` : ''}
           </span>`;
         el.addEventListener('click', () => {
-          playStream(id, 'tv', season, ep.episode, (currentDetail?.title || '') + ' — S' + season + 'E' + ep.episode);
+          const isAni = playType === 'anichin' || String(id).startsWith('anichin:');
+          const titleSuffix = isAni ? ` — Episode ${epNum}` : ` — S${season}E${epNum}`;
+          playStream(id, playType, season, epNum, (currentDetail?.title || '') + titleSuffix);
         });
         list.appendChild(el);
       });
@@ -917,8 +938,11 @@ async function loadEpisodes(id, season) {
     loadComments(id, token, signal);
     loadRating(id, token, signal);
 
-    if (watchState.type === 'tv' && season) {
-      renderEpisodeStrip(id, season, episode, token, signal);
+    const isAnichin = watchState.type === 'anichin' || String(id).startsWith('anichin:');
+    const isSeries = watchState.type === 'tv' || isAnichin;
+
+    if (isSeries && (season || isAnichin)) {
+      renderEpisodeStrip(id, season || 1, episode || 1, token, signal);
     } else {
       $('#watchEpisodes').style.display = 'none';
       episodeStripData = { id: null, season: null, episodes: [] };
@@ -929,10 +953,22 @@ async function loadEpisodes(id, season) {
       if (!isWatchActive(token)) return;
       const stream = res.playlist || {};
       watchState.stream = stream;
-      if (!stream.mp4 && !stream.playlist) throw new Error('Tidak ada stream');
-      $('#playerStatus').textContent = 'Menemukan sumber stream. Memutar...';
-      setupQualities(stream);
-      initPlayer(stream, false, token);
+
+      const hasDirect = !!(stream.mp4 || stream.playlist);
+      const hasEmbed = !!(stream.embed || (stream.mirrors && stream.mirrors.length));
+
+      if (!hasDirect && !hasEmbed) throw new Error('Tidak ada stream');
+
+      setupWatchServers(stream, token);
+
+      if (hasDirect) {
+        $('#playerStatus').textContent = 'Menemukan sumber stream. Memutar...';
+        setupQualities(stream);
+        initPlayer(stream, false, token);
+      } else {
+        const embedUrl = stream.embed || stream.mirrors[0].url;
+        playIframe(embedUrl, token);
+      }
     } catch (err) {
       if (isAbort(err) || !isWatchActive(token)) return;
       console.error(err);
@@ -954,6 +990,89 @@ async function loadEpisodes(id, season) {
     }
   }
 
+  function setupWatchServers(stream, token) {
+    const box = $('#watchServers');
+    const list = $('#watchServersList');
+    if (!box || !list) return;
+
+    const mirrors = stream.mirrors || [];
+    const hasDirect = !!(stream.mp4 || stream.playlist);
+
+    if (!mirrors.length) {
+      box.style.display = 'none';
+      list.innerHTML = '';
+      return;
+    }
+
+    list.innerHTML = '';
+    box.style.display = '';
+
+    if (hasDirect) {
+      const btnDirect = document.createElement('button');
+      btnDirect.type = 'button';
+      btnDirect.className = 'watch-server-btn active';
+      btnDirect.innerHTML = `${icon('play', 12, 2.3)} Server Utama (Direct HD)`;
+      btnDirect.addEventListener('click', () => {
+        if (!isWatchActive(token)) return;
+        $$('#watchServersList .watch-server-btn').forEach(b => b.classList.remove('active'));
+        btnDirect.classList.add('active');
+        switchToDirect(stream, token);
+      });
+      list.appendChild(btnDirect);
+    }
+
+    mirrors.forEach((m, idx) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'watch-server-btn' + (!hasDirect && idx === 0 ? ' active' : '');
+      btn.innerHTML = `${icon('broadcast', 12, 2.3)} ${escapeHtml(m.name || 'Server ' + (idx + 1))}`;
+      btn.addEventListener('click', () => {
+        if (!isWatchActive(token)) return;
+        $$('#watchServersList .watch-server-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        playIframe(m.url, token);
+      });
+      list.appendChild(btn);
+    });
+  }
+
+  function switchToDirect(stream, token) {
+    const video = $('#playerVideo');
+    const iframe = $('#playerIframe');
+    if (iframe) {
+      iframe.src = 'about:blank';
+      iframe.style.display = 'none';
+    }
+    if (video) video.style.display = '';
+    $('#playerError').style.display = 'none';
+    $('#playerStatus').style.display = '';
+    $('#playerStatus').textContent = 'Memutar via server utama...';
+    setupQualities(stream);
+    initPlayer(stream, false, token);
+  }
+
+  function playIframe(embedUrl, token) {
+    if (!isWatchActive(token)) return;
+    destroyHls();
+    const video = $('#playerVideo');
+    const iframe = $('#playerIframe');
+    if (video) {
+      video.pause();
+      video.removeAttribute('src');
+      video.load();
+      video.style.display = 'none';
+    }
+    $('#playerStatus').style.display = 'none';
+    $('#playerError').style.display = 'none';
+    $('#qualityPicker').style.display = 'none';
+    closeQualityMenu();
+
+    if (iframe) {
+      iframe.style.display = '';
+      iframe.src = embedUrl;
+    }
+  }
+
   function playerErrorHtml(title, desc) {
     return `<div class="player-error-inner">
       <div class="player-error-ico">${icon('alert-triangle', 26, 2)}</div>
@@ -967,7 +1086,13 @@ async function loadEpisodes(id, season) {
   }
 
   function resetPlayerUI(title) {
+    const iframe = $('#playerIframe');
+    if (iframe) {
+      iframe.src = 'about:blank';
+      iframe.style.display = 'none';
+    }
     const video = $('#playerVideo');
+    video.style.display = '';
     const status = $('#playerStatus');
     const errBox = $('#playerError');
     errBox.style.display = 'none';
@@ -978,6 +1103,10 @@ async function loadEpisodes(id, season) {
     video.pause();
     video.removeAttribute('src');
     video.load();
+    const servers = $('#watchServers');
+    if (servers) servers.style.display = 'none';
+    const serverList = $('#watchServersList');
+    if (serverList) serverList.innerHTML = '';
     $('#watchTitle').textContent = title || 'Memuat...';
     $('#watchSub').innerHTML = '';
     $('#watchDesc').textContent = '';
@@ -1210,13 +1339,14 @@ async function loadEpisodes(id, season) {
     return rec && typeof rec.r === 'number' ? rec.r : 0;
   }
   function setWatchProgress() {
-    if (watchState.type !== 'tv' || !watchState.id || !watchState.season || !watchState.episode) return;
+    const isAni = watchState.type === 'anichin' || String(watchState.id).startsWith('anichin:');
+    if ((watchState.type !== 'tv' && !isAni) || !watchState.id || !watchState.episode) return;
     const video = $('#playerVideo');
     const dur = video.duration;
     if (!dur || !isFinite(dur) || dur <= 0) return;
     const ratio = Math.max(0, Math.min(1, video.currentTime / dur));
     const store = loadProgressStore();
-    store[progressKey(watchState.id, watchState.season, watchState.episode)] = {
+    store[progressKey(watchState.id, watchState.season || 1, watchState.episode)] = {
       r: ratio, t: video.currentTime, d: dur, at: Date.now()
     };
     saveProgressStore(store);
@@ -1241,8 +1371,9 @@ async function loadEpisodes(id, season) {
 
   function stripTitleFor(ep) {
     const base = (watchState.detail && (watchState.detail.title || watchState.detail.name)) || watchState.title || '';
-    const clean = String(base).replace(/\s*—\s*S\d+E\d+\s*$/, '').trim();
-    return (clean || 'Episode') + ' — S' + watchState.season + 'E' + ep;
+    const clean = String(base).replace(/\s*—\s*(S\d+E\d+|Episode\s*\d+)\s*$/, '').trim();
+    const isAni = watchState.type === 'anichin' || String(watchState.id).startsWith('anichin:');
+    return isAni ? `${clean || 'Donghua'} — Episode ${ep}` : `${clean || 'Episode'} — S${watchState.season || 1}E${ep}`;
   }
 
   async function renderEpisodeStrip(id, season, episode, token, signal) {
@@ -1250,12 +1381,12 @@ async function loadEpisodes(id, season) {
     const scroll = $('#watchEpsScroll');
     wrap.style.display = '';
 
-    const cacheKey = id + ':' + season;
+    const cacheKey = id + ':' + (season || 1);
     let eps = episodeCache.get(cacheKey);
     if (!eps) {
       scroll.innerHTML = '<span class="ep-hint">Memuat episode...</span>';
       try {
-        const res = await Api.tvEpisodes(id, season, signal);
+        const res = await Api.tvEpisodes(id, season || 1, signal);
         if (!isWatchActive(token)) return;
         eps = res.data || [];
         episodeCache.set(cacheKey, eps);
@@ -1267,19 +1398,20 @@ async function loadEpisodes(id, season) {
     }
     if (!isWatchActive(token)) return;
 
-    episodeStripData = { id, season, episodes: eps };
+    episodeStripData = { id, season: season || 1, episodes: eps };
     if (!eps.length) { wrap.style.display = 'none'; return; }
     scroll.innerHTML = '';
     eps.forEach(ep => {
+      const epNum = ep.episode || ep.episode_number || 1;
       const chip = document.createElement('button');
       chip.type = 'button';
-      chip.className = 'watch-ep-chip' + (Number(ep.episode) === Number(episode) ? ' active' : '');
-      chip.dataset.ep = ep.episode;
-      chip.title = 'Episode ' + ep.episode;
-      chip.innerHTML = `<span class="watch-ep-chip-num">${ep.episode}</span><span class="watch-ep-chip-bar"></span>`;
+      chip.className = 'watch-ep-chip' + (Number(epNum) === Number(episode) ? ' active' : '');
+      chip.dataset.ep = epNum;
+      chip.title = 'Episode ' + epNum;
+      chip.innerHTML = `<span class="watch-ep-chip-num">${epNum}</span><span class="watch-ep-chip-bar"></span>`;
       chip.addEventListener('click', () => {
-        if (Number(ep.episode) === Number(watchState.episode)) return;
-        playStream(id, 'tv', season, ep.episode, stripTitleFor(ep.episode));
+        if (Number(epNum) === Number(watchState.episode)) return;
+        playStream(id, watchState.type, season || 1, epNum, stripTitleFor(epNum));
       });
       scroll.appendChild(chip);
     });
@@ -1301,11 +1433,16 @@ async function loadEpisodes(id, season) {
       avatar.src = '/img/no-poster.svg';
     }
 
+    const isAnichin = watchState.type === 'anichin' || String(watchState.id).startsWith('anichin:');
     const parts = [];
     if (d.duration) parts.push(escapeHtml(d.duration));
     if (d.release) parts.push(escapeHtml(d.release));
     if (d.rating) parts.push(`<span class="rating">${icon('star', 12, 2.3)} ${Number(d.rating).toFixed(1)}</span>`);
-    if (watchState.type === 'tv') parts.push(`<span class="meta-ico">${icon('tv', 13, 2.3)} Serial</span>`);
+    if (isAnichin) {
+      parts.push(`<span class="meta-ico">${icon('sparkles', 13, 2.3)} Donghua Sub Indo</span>`);
+    } else if (watchState.type === 'tv') {
+      parts.push(`<span class="meta-ico">${icon('tv', 13, 2.3)} Serial</span>`);
+    }
     $('#watchSub').innerHTML = parts.join('<span class="dot-sep">•</span>');
 
     $('#watchDesc').textContent = d.overview || 'Belum ada deskripsi untuk judul ini.';
@@ -1313,8 +1450,13 @@ async function loadEpisodes(id, season) {
     const chips = [];
     if (d.genre) chips.push({ label: 'Genre', value: d.genre });
     if (d.network) chips.push({ label: 'Network', value: d.network });
+    if (d.studio) chips.push({ label: 'Studio', value: d.studio });
     if (d.certification) chips.push({ label: 'Rating Usia', value: d.certification });
-    if (watchState.type === 'tv') chips.push({ label: 'Episode', value: `S${watchState.season || 1} E${watchState.episode || 1}` });
+    if (isAnichin) {
+      chips.push({ label: 'Episode', value: `Episode ${watchState.episode || 1}` });
+    } else if (watchState.type === 'tv') {
+      chips.push({ label: 'Episode', value: `S${watchState.season || 1} E${watchState.episode || 1}` });
+    }
     $('#watchMeta').innerHTML = chips.map(c =>
       `<div class="fact-cell"><div class="fact-label">${escapeHtml(c.label)}</div><div class="fact-value">${escapeHtml(c.value)}</div></div>`
     ).join('');
@@ -1492,14 +1634,26 @@ async function loadEpisodes(id, season) {
     return new Date(ts).toLocaleDateString('id-ID');
   }
 
-function closePlayer() {
+  function closePlayer() {
     setWatchProgress();
     closeQualityMenu();
     destroyHls();
+    const iframe = $('#playerIframe');
+    if (iframe) {
+      iframe.src = 'about:blank';
+      iframe.style.display = 'none';
+    }
     const v = $('#playerVideo');
-    v.pause();
-    v.removeAttribute('src');
-    v.load();
+    if (v) {
+      v.style.display = '';
+      v.pause();
+      v.removeAttribute('src');
+      v.load();
+    }
+    const servers = $('#watchServers');
+    if (servers) servers.style.display = 'none';
+    const serverList = $('#watchServersList');
+    if (serverList) serverList.innerHTML = '';
     watchState.id = null;
     watchState.myVote = 0;
     watchState.myRating = 0;

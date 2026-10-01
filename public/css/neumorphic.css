@@ -574,6 +574,16 @@ header.neu-header {
   z-index: 2;
 }
 
+.movie-type-badge.anichin {
+  background: rgba(0, 102, 102, 0.9);
+  color: #fff;
+  border: 1px solid rgba(0, 204, 204, 0.4);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 /* ── Live badge (realtime) ───────────────────────────────── */
 .live-badge {
   display: inline-flex; align-items: center; gap: 5px;
@@ -1182,6 +1192,63 @@ body.watch-mode .footer-note { display: none; }
 }
 .watch-back-overlay:hover { background: rgba(0,102,102,0.78); }
 .watch-back-overlay:active { transform: scale(0.93); }
+
+/* ── Watch Video Server Switcher ── */
+.watch-servers {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 14px;
+  margin-top: 10px;
+  background: var(--bg-surface);
+  border-radius: 14px;
+  box-shadow: var(--neu-inset);
+}
+.watch-servers-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Space Mono', monospace;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+.watch-servers-list {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.watch-server-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--color-text);
+  background: var(--bg-surface);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 9px;
+  box-shadow: 2px 2px 6px var(--shadow-dark), -2px -2px 6px var(--shadow-light);
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+.watch-server-btn:hover {
+  color: var(--color-primary);
+  transform: translateY(-1px);
+}
+.watch-server-btn.active {
+  color: var(--color-primary);
+  box-shadow: inset 2px 2px 4px var(--shadow-dark), inset -2px -2px 4px var(--shadow-light);
+  border-color: rgba(0, 102, 102, 0.35);
+  font-weight: 700;
+}
 
 /* Dropdown Resolusi & Unduhan di baris judul */
 .watch-res-picker { position: relative; margin-left: auto; flex-shrink: 0; }

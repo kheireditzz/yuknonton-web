@@ -208,6 +208,7 @@
         <div class="watch-stage" id="watchStage">
           <div class="watch-video-wrap">
             <video id="playerVideo" class="player-video" controls autoplay playsinline webkit-playsinline poster=""></video>
+            <iframe id="playerIframe" class="player-video player-iframe" style="display:none;border:none;width:100%;height:100%;" allowfullscreen allow="autoplay; fullscreen; picture-in-picture"></iframe>
             <div id="playerStatus" class="player-loading">Menghubungi server streaming...</div>
             <div id="playerError" class="player-error" style="display:none;"></div>
 
@@ -216,6 +217,15 @@
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
             </button>
           </div>
+        </div>
+
+        <!-- Server Switcher (OK.ru direct, Dailymotion, Rumble, dll) -->
+        <div class="watch-servers" id="watchServers" style="display:none;">
+          <span class="watch-servers-label">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
+            Server Video:
+          </span>
+          <div class="watch-servers-list" id="watchServersList"></div>
         </div>
 
         <!-- Baris channel: pp + nama + durasi + tanggal rilis + dropdown resolusi/unduhan -->
@@ -312,10 +322,10 @@
 </main>
 
   <footer class="footer-note">
-    YukNonton • Nonton film & serial viral • Data dari TMDB & vidlink.pro • Untuk edukasi semata
+    YukNonton • Nonton film, serial &amp; donghua viral sub Indo • Data dari TMDB, VidLink &amp; Anichin
   </footer>
 
-  <script src="/js/api.js?v=1.9.1"></script>
-  <script src="/js/core.js?v=1.9.1"></script>
+  <script src="/js/api.js?v=2.0.0"></script>
+  <script src="/js/core.js?v=2.0.0"></script>
 </body>
 </html>
