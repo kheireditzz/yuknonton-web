@@ -25,7 +25,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/neumorphic.css?v=1.9.1">
+  <link rel="stylesheet" href="/css/neumorphic.css?v=2.6.0">
   <!-- HLS.js untuk memutar stream m3u8 -->
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js"></script>
 </head>
@@ -206,13 +206,24 @@
     <div id="watchView" class="watch-view">
       <section class="watch-card">
         <div class="watch-stage" id="watchStage">
-          <div class="watch-video-wrap">
+          <div class="watch-video-wrap" id="watchVideoWrap">
             <video id="playerVideo" class="player-video" controls autoplay playsinline webkit-playsinline poster=""></video>
             <iframe id="playerIframe" class="player-video player-iframe" style="display:none;border:none;width:100%;height:100%;" allowfullscreen allow="autoplay; fullscreen; picture-in-picture" sandbox="allow-scripts allow-same-origin allow-forms"></iframe>
+            
+            <!-- Indikator Logo Jeda (Pause) & Logo Putar (Play) -->
+            <div class="player-state-indicator" id="playerStateIndicator" title="Putar Video" aria-label="Putar Video">
+              <div class="player-state-icon state-pause" id="playerStatePauseIcon">
+                <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1.5"></rect><rect x="14" y="4" width="4" height="16" rx="1.5"></rect></svg>
+              </div>
+              <div class="player-state-icon state-play" id="playerStatePlayIcon">
+                <svg width="34" height="34" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>
+              </div>
+            </div>
+
             <div id="playerStatus" class="player-loading">Menghubungi server streaming...</div>
             <div id="playerError" class="player-error" style="display:none;"></div>
 
-            <!-- Tombol kembali menempel di sudut kiri atas video -->
+            <!-- Tombol kembali menempel di sudut kiri atas video (auto-hide saat play, muncul saat pause/interaksi) -->
             <button type="button" class="watch-back-overlay" id="playerBackBtn" title="Kembali" aria-label="Kembali">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
             </button>
@@ -228,7 +239,7 @@
           <div class="watch-servers-list" id="watchServersList"></div>
         </div>
 
-        <!-- Baris channel: pp + nama + durasi + tanggal rilis + dropdown resolusi/unduhan -->
+        <!-- Baris channel: poster avatar + nama judul + durasi + tanggal rilis -->
         <div class="watch-channel">
           <div class="watch-channel-avatar" id="watchAvatar">
             <img id="watchAvatarImg" alt="" src="/img/no-poster.svg" referrerpolicy="no-referrer">
@@ -237,27 +248,58 @@
             <h1 class="watch-channel-name" id="watchTitle">Memuat...</h1>
             <div class="watch-channel-meta" id="watchSub"></div>
           </div>
-
-          <!-- Dropdown Resolusi & Unduhan -->
-          <div class="quality-picker watch-res-picker" id="qualityPicker" style="display:none;">
-            <button type="button" class="watch-res-toggle quality-toggle" id="qualityToggle" title="Resolusi & Unduhan" aria-label="Resolusi & Unduhan" aria-haspopup="true">
-              <svg class="watch-res-toggle-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"></rect><path d="M17 2l-5 5-5-5"></path></svg>
-              <span class="watch-res-toggle-text">Resolusi &amp; Unduhan</span>
-              <span class="watch-res-badge" id="qualityLabel">Auto</span>
-              <svg class="watch-res-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
-            </button>
-            <div class="quality-menu" id="qualityMenu" role="menu"></div>
-          </div>
         </div>
 
-        <!-- Strip episode: nomor saja, geser kanan-kiri, ada garis progres tontonan -->
+        <!-- Strip episode full di bawah judul: geser kanan-kiri, responsive & taktil -->
         <div class="watch-episodes" id="watchEpisodes" style="display:none;">
+          <div class="watch-episodes-head">
+            <div class="watch-episodes-title-wrap">
+              <span class="watch-episodes-icon">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline></svg>
+              </span>
+              <span class="watch-episodes-heading">Pilih Episode</span>
+              <span class="watch-episodes-cur" id="watchEpCurrentBadge">Ep 1</span>
+            </div>
+            <div class="watch-episodes-controls">
+              <span class="watch-episodes-count" id="watchEpTotalCount">0 Episode</span>
+              <div class="watch-episodes-nav">
+                <button type="button" class="watch-ep-nav-btn prev" id="watchEpNavPrev" aria-label="Geser Episode Kiri" title="Geser Kiri">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                </button>
+                <button type="button" class="watch-ep-nav-btn next" id="watchEpNavNext" aria-label="Geser Episode Kanan" title="Geser Kanan">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </button>
+              </div>
+            </div>
+          </div>
           <div class="watch-eps-scroll" id="watchEpsScroll"></div>
         </div>
 
         <p class="watch-desc" id="watchDesc"></p>
 
         <div class="watch-meta-grid" id="watchMeta"></div>
+
+        <!-- Slide Film Lain Yang Bagus (Rekomendasi Berganti Tiap Hari) -->
+        <div class="watch-related" id="watchRelated">
+          <div class="watch-related-head">
+            <div class="watch-related-title-wrap">
+              <span class="watch-related-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" class="text-primary"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+              </span>
+              <span class="watch-related-title">Rekomendasi Pilihan Hari Ini</span>
+              <span class="watch-related-badge">Update Harian</span>
+            </div>
+            <div class="watch-related-nav">
+              <button type="button" class="watch-related-nav-btn prev" id="watchRelatedPrev" aria-label="Geser Kiri" title="Geser Kiri">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+              </button>
+              <button type="button" class="watch-related-nav-btn next" id="watchRelatedNext" aria-label="Geser Kanan" title="Geser Kanan">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+              </button>
+            </div>
+          </div>
+          <div class="watch-related-strip" id="watchRelatedStrip"></div>
+        </div>
       </section>
     </div>
 
@@ -267,7 +309,123 @@
     YukNonton • Nonton film, serial &amp; donghua viral sub Indo • Data dari TMDB, VidLink &amp; Anichin
   </footer>
 
+  <!-- Full-Screen Search Tab Overlay (Tap Full & Bagus) -->
+  <div id="fullSearchOverlay" class="full-search-overlay" style="display:none;" role="dialog" aria-modal="true" aria-label="Pencarian Film dan Donghua">
+    <div class="full-search-container">
+      
+      <!-- Top Bar: Tombol Kembali + Kolom Cari + Tombol Clear -->
+      <div class="full-search-header">
+        <button type="button" class="full-search-back-btn" id="fullSearchBackBtn" title="Kembali" aria-label="Tutup Pencarian">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12"></line>
+            <polyline points="12 19 5 12 12 5"></polyline>
+          </svg>
+        </button>
+
+        <div class="full-search-input-wrap">
+          <svg class="full-search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="fullSearchInput" class="full-search-input" placeholder="Cari film, serial, donghua, atau aktor..." autocomplete="off" enterkeyhint="search">
+          <button type="button" class="full-search-clear-btn" id="fullSearchClearBtn" style="display:none;" title="Bersihkan" aria-label="Bersihkan Input">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+
+        <button type="button" class="full-search-action-btn" id="fullSearchSubmitBtn">
+          Cari
+        </button>
+      </div>
+
+      <!-- Filter Kategori Scope -->
+      <div class="full-search-filters" id="fullSearchFilters">
+        <button type="button" class="full-search-filter-chip active" data-scope="all">Semua</button>
+        <button type="button" class="full-search-filter-chip" data-scope="donghua">🔥 Donghua</button>
+        <button type="button" class="full-search-filter-chip" data-scope="movie">🎬 Film Bioskop</button>
+        <button type="button" class="full-search-filter-chip" data-scope="tv">📺 Serial Populer</button>
+        <button type="button" class="full-search-filter-chip" data-scope="horror">👻 Horor</button>
+      </div>
+
+      <!-- State 1: Discovery Screen (Sebelum Mengetik / Quick Picks) -->
+      <div id="fullSearchDiscovery" class="full-search-discovery">
+        <!-- Trending Searches -->
+        <div class="full-search-section">
+          <div class="full-search-section-header">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="text-primary"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+            <span class="full-search-section-title">Paling Sering Dicari Hari Ini</span>
+          </div>
+          <div class="full-search-tag-cloud" id="fullSearchTrendingTags">
+            <button type="button" class="full-search-tag" data-query="Renegade Immortal">Renegade Immortal</button>
+            <button type="button" class="full-search-tag" data-query="Battle Through The Heavens">BTTH Nian Fan</button>
+            <button type="button" class="full-search-tag" data-query="Perfect World">Perfect World</button>
+            <button type="button" class="full-search-tag" data-query="Swallowed Star">Swallowed Star</button>
+            <button type="button" class="full-search-tag" data-query="Arcane">Arcane</button>
+            <button type="button" class="full-search-tag" data-query="Deadpool">Deadpool &amp; Wolverine</button>
+            <button type="button" class="full-search-tag" data-query="Exhuma">Exhuma</button>
+            <button type="button" class="full-search-tag" data-query="Solo Leveling">Solo Leveling</button>
+            <button type="button" class="full-search-tag" data-query="Siksa Kubur">Siksa Kubur</button>
+            <button type="button" class="full-search-tag" data-query="Shrouding Heavens">Shrouding Heavens</button>
+          </div>
+        </div>
+
+        <!-- Browse by Genre Quick Grid -->
+        <div class="full-search-section">
+          <div class="full-search-section-header">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="text-primary"><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg>
+            <span class="full-search-section-title">Jelajah Genre Pilihan</span>
+          </div>
+          <div class="full-search-genre-grid">
+            <button type="button" class="full-search-genre-card" data-genre="Xianxia">
+              <span class="genre-icon">⚔️</span>
+              <span class="genre-name">Xianxia &amp; Donghua</span>
+              <span class="genre-sub">Kultivasi tanpa batas</span>
+            </button>
+            <button type="button" class="full-search-genre-card" data-genre="Action">
+              <span class="genre-icon">💥</span>
+              <span class="genre-name">Action &amp; Thriller</span>
+              <span class="genre-sub">Aksi memacu adrenalin</span>
+            </button>
+            <button type="button" class="full-search-genre-card" data-genre="Sci-Fi">
+              <span class="genre-icon">🚀</span>
+              <span class="genre-name">Sci-Fi &amp; Fantasy</span>
+              <span class="genre-sub">Masa depan &amp; magis</span>
+            </button>
+            <button type="button" class="full-search-genre-card" data-genre="Horor">
+              <span class="genre-icon">👻</span>
+              <span class="genre-name">Horor &amp; Misteri</span>
+              <span class="genre-sub">Ketegangan mencekam</span>
+            </button>
+            <button type="button" class="full-search-genre-card" data-genre="Comedy">
+              <span class="genre-icon">😄</span>
+              <span class="genre-name">Komedi</span>
+              <span class="genre-sub">Hiburan penuh tawa</span>
+            </button>
+            <button type="button" class="full-search-genre-card" data-genre="Romance">
+              <span class="genre-icon">💖</span>
+              <span class="genre-name">Romansa &amp; Drama</span>
+              <span class="genre-sub">Kisah cinta emosional</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- State 2: Live Results Screen -->
+      <div id="fullSearchResultsContainer" class="full-search-results-wrap" style="display:none;">
+        <div class="full-search-meta-bar">
+          <span class="full-search-results-title" id="fullSearchResultsTitle">Hasil Pencarian</span>
+          <span class="full-search-results-count" id="fullSearchResultsCount">0 ditemukan</span>
+        </div>
+        <div class="movies-grid" id="fullSearchResultsGrid"></div>
+      </div>
+
+    </div>
+  </div>
+
   <script src="/js/api.js?v=2.4.0"></script>
-  <script src="/js/core.js?v=2.4.0"></script>
+  <script src="/js/core.js?v=2.6.1"></script>
 </body>
 </html>

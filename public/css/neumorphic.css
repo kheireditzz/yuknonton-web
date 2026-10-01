@@ -33,9 +33,10 @@ img {
 
 html {
   width: 100%;
+  max-width: 100vw;
   margin: 0;
   padding: 0;
-  overflow-x: clip;
+  overflow-x: hidden;
   overscroll-behavior-y: none;
   -webkit-overflow-scrolling: touch;
   scroll-behavior: smooth;
@@ -47,11 +48,12 @@ body {
   font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
   min-height: 100vh;
   width: 100%;
+  max-width: 100vw;
   margin: 0;
-  padding-top: calc(var(--header-height) + 16px);
+  padding-top: calc(var(--header-height) + 12px);
   padding-bottom: 28px;
   position: relative;
-  overflow-x: clip;
+  overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -118,9 +120,10 @@ header.neu-header {
 
 /* ── Container ───────────────────────────────────────────── */
 .container {
+  width: 100%;
   max-width: 1180px;
   margin: 0 auto;
-  padding: 0 16px;
+  padding: 0 14px;
 }
 
 /* ── Loading bar (pengganti notifikasi) ──────────────────── */
@@ -1179,19 +1182,98 @@ body.watch-mode .footer-note { display: none; }
 /* Input error (validasi inline) */
 .input-error { box-shadow: inset 0 0 0 2px var(--color-danger) !important; }
 
-/* Tombol kembali di sudut kiri atas video */
+/* Tombol kembali di sudut kiri atas video (Auto-hide saat play, muncul saat pause/interaksi) */
 .watch-back-overlay {
   position: absolute; top: 12px; left: 12px; z-index: 5;
   width: 44px; height: 44px; border-radius: 13px;
-  background: rgba(15,20,26,0.5);
+  background: rgba(15,20,26,0.62);
   backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   border: 1px solid rgba(255,255,255,0.25);
   color: #fff; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  transition: background 0.15s ease, transform 0.15s ease;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  transition: opacity 0.32s cubic-bezier(0.4, 0, 0.2, 1), transform 0.32s cubic-bezier(0.4, 0, 0.2, 1), background 0.15s ease;
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
 }
-.watch-back-overlay:hover { background: rgba(0,102,102,0.78); }
+.watch-back-overlay:hover { background: rgba(0,102,102,0.85); transform: translateY(-1px); }
 .watch-back-overlay:active { transform: scale(0.93); }
+
+/* Saat video diputar (playing): tombol kembali otomatis fade out menghilang */
+.watch-video-wrap.controls-hidden .watch-back-overlay {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-8px);
+}
+
+/* ── Overlay Logo Jeda (Pause) & Logo Putar (Play) di Tengah Video ── */
+.player-state-indicator {
+  position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, -50%) scale(0.85);
+  width: 72px; height: 72px;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.72);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1.5px solid rgba(255, 255, 255, 0.28);
+  color: #ffffff;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 1px 2px rgba(255, 255, 255, 0.25);
+  z-index: 4;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.player-state-icon {
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Keadaan Jeda (Pause): Logo jeda muncul di tengah dan tombol kembali muncul */
+.player-state-indicator.is-paused {
+  opacity: 1;
+  pointer-events: auto;
+  cursor: pointer;
+  transform: translate(-50%, -50%) scale(1);
+}
+.player-state-indicator.is-paused .state-pause {
+  display: flex;
+}
+.player-state-indicator.is-paused:hover {
+  background: rgba(0, 102, 102, 0.85);
+  transform: translate(-50%, -50%) scale(1.08);
+}
+.player-state-indicator.is-paused:active {
+  transform: translate(-50%, -50%) scale(0.94);
+}
+
+/* Keadaan Putar (Play): Animasi logo putar berdenyut halus lalu menghilang */
+.player-state-indicator.is-anim-play {
+  pointer-events: none;
+  animation: playerStatePulsePlay 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.player-state-indicator.is-anim-play .state-play {
+  display: flex;
+}
+
+@keyframes playerStatePulsePlay {
+  0% {
+    opacity: 0.95;
+    transform: translate(-50%, -50%) scale(0.85);
+  }
+  50% {
+    opacity: 0.9;
+    transform: translate(-50%, -50%) scale(1.15);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.35);
+  }
+}
 
 /* ── Watch Video Server Switcher ── */
 .watch-servers {
@@ -1359,18 +1441,95 @@ body.watch-mode .footer-note { display: none; }
 }
 .watch-channel-meta .rating { color: var(--color-warning); font-weight: 700; }
 .watch-channel-meta .dot-sep { opacity: 0.5; }
-/* ── Strip episode di bawah nama film (nomor saja, bisa digeser) ── */
+/* ── Strip episode di bawah nama film (Full Width, Geser Kiri-Kanan Taktil) ── */
 .watch-episodes {
-  margin-top: 12px;
-  padding: 4px 2px 2px;
+  width: 100%;
+  margin-top: 14px;
+  padding: 12px 14px 14px;
+  background: var(--bg-surface);
+  border-radius: 16px;
+  box-shadow: var(--neu-inset);
+}
+.watch-episodes-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.watch-episodes-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.watch-episodes-icon {
+  color: var(--color-primary);
+  display: flex;
+  align-items: center;
+}
+.watch-episodes-heading {
+  font-family: 'Space Mono', 'Plus Jakarta Sans', sans-serif;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+.watch-episodes-cur {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: var(--color-primary);
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(0, 102, 102, 0.35);
+}
+.watch-episodes-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.watch-episodes-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+.watch-episodes-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.watch-ep-nav-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: none;
+  background: var(--bg-surface);
+  box-shadow: var(--neu-extruded-sm);
+  color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.watch-ep-nav-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--neu-extruded);
+}
+.watch-ep-nav-btn:active {
+  transform: translateY(0);
+  box-shadow: var(--neu-inset);
 }
 .watch-eps-scroll {
   display: flex;
-  gap: 9px;
+  gap: 10px;
   overflow-x: auto;
   overflow-y: hidden;
-  padding: 6px 2px 8px;
+  padding: 6px 2px 6px;
   scroll-snap-type: x proximity;
+  scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
 }
@@ -1378,31 +1537,56 @@ body.watch-mode .footer-note { display: none; }
 .watch-ep-chip {
   position: relative;
   flex: 0 0 auto;
-  min-width: 46px;
+  min-width: 54px;
   height: 44px;
-  padding: 0 13px;
+  padding: 0 14px;
   border: none;
   border-radius: 12px;
   background: var(--bg-surface);
   color: var(--color-text);
   font-family: 'JetBrains Mono', monospace;
-  font-size: 0.85rem;
+  font-size: 0.88rem;
   font-weight: 700;
   box-shadow: var(--neu-extruded-sm);
   cursor: pointer;
   overflow: hidden;
   scroll-snap-align: center;
-  transition: transform 0.14s ease, box-shadow 0.14s ease, color 0.14s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  transition: transform 0.14s ease, box-shadow 0.14s ease, background 0.14s ease, color 0.14s ease;
 }
-.watch-ep-chip:active { transform: translateY(1px); box-shadow: var(--neu-inset); }
+.watch-ep-chip:hover {
+  transform: translateY(-2px);
+  color: var(--color-primary);
+  box-shadow: var(--neu-extruded);
+}
+.watch-ep-chip:active {
+  transform: translateY(0);
+  box-shadow: var(--neu-inset);
+}
 .watch-ep-chip.active {
   background: var(--color-primary);
   color: #fff;
-  box-shadow: 0 8px 18px rgba(0,102,102,0.4);
+  box-shadow: 0 8px 18px rgba(0,102,102,0.45);
 }
-.watch-ep-chip.done { color: var(--color-primary); }
-.watch-ep-chip.active.done { color: #fff; }
-.watch-ep-chip-num { position: relative; z-index: 2; }
+.watch-ep-chip.done {
+  color: var(--color-primary);
+}
+.watch-ep-chip.active.done {
+  color: #fff;
+}
+.watch-ep-chip-prefix {
+  font-size: 0.68rem;
+  font-weight: 600;
+  opacity: 0.7;
+}
+.watch-ep-chip-num {
+  position: relative;
+  z-index: 2;
+  font-weight: 800;
+}
 .watch-ep-chip-bar {
   position: absolute;
   left: 0; bottom: 0;
@@ -1413,6 +1597,200 @@ body.watch-mode .footer-note { display: none; }
   z-index: 1;
 }
 .watch-ep-chip.active .watch-ep-chip-bar { background: rgba(255,255,255,0.9); }
+
+/* ── Slide Film Lain Yang Bagus (Rekomendasi Berganti Tiap Hari) ── */
+.watch-related {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.75);
+}
+.watch-related-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  padding: 0 2px;
+}
+.watch-related-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.watch-related-icon {
+  color: var(--color-primary);
+  display: flex;
+  align-items: center;
+}
+.watch-related-title {
+  font-weight: 800;
+  font-size: 1.05rem;
+  color: var(--color-text);
+  letter-spacing: -0.01em;
+}
+.watch-related-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(0, 102, 102, 0.12);
+  color: var(--color-primary);
+}
+.watch-related-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.watch-related-nav-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: var(--bg-surface);
+  box-shadow: var(--neu-extruded-sm);
+  color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.watch-related-nav-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--neu-extruded);
+}
+.watch-related-nav-btn:active {
+  transform: translateY(0);
+  box-shadow: var(--neu-inset);
+}
+.watch-related-strip {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 6px 4px 16px;
+  scroll-snap-type: x proximity;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.watch-related-strip::-webkit-scrollbar { display: none; }
+
+.related-card {
+  flex: 0 0 144px;
+  scroll-snap-align: start;
+  cursor: pointer;
+  background: var(--bg-surface);
+  border-radius: 16px;
+  padding: 10px;
+  box-shadow: var(--neu-extruded-sm);
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s ease;
+  user-select: none;
+}
+.related-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--neu-extruded);
+}
+.related-card:active {
+  transform: translateY(0);
+  box-shadow: var(--neu-inset);
+}
+.related-poster-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--shadow-dark);
+}
+.related-poster {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.related-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(30, 41, 56, 0.85);
+  color: #fff;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.62rem;
+  font-weight: 700;
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  z-index: 2;
+}
+.related-badge.anichin {
+  background: var(--color-primary);
+  color: #fff;
+}
+.related-rating {
+  position: absolute;
+  bottom: 6px;
+  left: 6px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(30, 41, 56, 0.85);
+  color: #FFD166;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.64rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  z-index: 2;
+}
+.related-play-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 3;
+}
+.related-card:hover .related-play-overlay { opacity: 1; }
+.related-play-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+}
+.related-card-title {
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: var(--color-text);
+  margin-top: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+.related-card-meta {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  color: var(--color-text-muted);
+  margin-top: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (min-width: 640px) {
+  .related-card { flex-basis: 160px; }
+}
 
 /* ── Watch Info ──────────────────────────────────────────── */
 .watch-actions {
@@ -1518,4 +1896,290 @@ body.watch-mode .footer-note { display: none; }
   header.neu-header { padding: 0 14px; }
   .logo-title { font-size: 1.02rem; }
   .banner-card { height: 185px; }
+}
+
+/* ── Full-Screen Search Tab Overlay (Tap Full & Bagus) ── */
+.full-search-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: var(--bg-surface);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  animation: fullSearchFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+}
+
+@keyframes fullSearchFadeIn {
+  from { opacity: 0; transform: translateY(14px) scale(0.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.full-search-container {
+  width: 100%;
+  max-width: 1140px;
+  margin: 0 auto;
+  padding: 16px 18px 50px;
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.full-search-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: sticky;
+  top: 0;
+  background: var(--bg-surface);
+  padding: 8px 0 14px;
+  z-index: 10;
+}
+
+.full-search-back-btn {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: none;
+  background: var(--bg-surface);
+  box-shadow: var(--neu-extruded-sm);
+  color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.full-search-back-btn:active {
+  box-shadow: var(--neu-inset);
+  transform: scale(0.93);
+}
+
+.full-search-input-wrap {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.full-search-icon {
+  position: absolute;
+  left: 18px;
+  color: var(--color-primary);
+  pointer-events: none;
+}
+
+.full-search-input {
+  width: 100%;
+  height: 52px;
+  background: var(--bg-surface);
+  border: none;
+  border-radius: 999px;
+  padding: 0 46px 0 52px;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text);
+  box-shadow: var(--neu-inset-deep);
+  outline: none;
+  transition: box-shadow 0.2s ease;
+}
+.full-search-input:focus {
+  box-shadow: inset 4px 4px 8px var(--shadow-dark), inset -4px -4px 8px var(--shadow-light), 0 0 0 2px rgba(0, 102, 102, 0.28);
+}
+.full-search-input::placeholder {
+  color: var(--color-text-muted);
+  font-weight: 400;
+  opacity: 0.8;
+}
+
+.full-search-clear-btn {
+  position: absolute;
+  right: 14px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: var(--shadow-dark);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+.full-search-clear-btn:active {
+  transform: scale(0.88);
+}
+
+.full-search-action-btn {
+  height: 48px;
+  padding: 0 20px;
+  border-radius: 999px;
+  border: none;
+  background: var(--color-primary);
+  color: #fff;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(0, 102, 102, 0.35);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  flex-shrink: 0;
+}
+.full-search-action-btn:active {
+  transform: scale(0.95);
+  box-shadow: 0 2px 8px rgba(0, 102, 102, 0.3);
+}
+
+.full-search-filters {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 0 16px;
+  scrollbar-width: none;
+}
+.full-search-filters::-webkit-scrollbar { display: none; }
+
+.full-search-filter-chip {
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: none;
+  background: var(--bg-surface);
+  box-shadow: var(--neu-extruded-sm);
+  color: var(--color-text-muted);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.full-search-filter-chip.active {
+  box-shadow: var(--neu-inset);
+  color: var(--color-primary);
+  font-weight: 700;
+  background: var(--bg-surface);
+}
+
+.full-search-discovery {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  margin-top: 6px;
+}
+
+.full-search-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.full-search-section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text);
+  font-weight: 800;
+  font-size: 0.95rem;
+}
+.full-search-section-header .text-primary {
+  color: var(--color-primary);
+}
+
+.full-search-tag-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.full-search-tag {
+  padding: 9px 16px;
+  border-radius: 999px;
+  border: none;
+  background: var(--bg-surface);
+  box-shadow: var(--neu-extruded-sm);
+  color: var(--color-text);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16,1,0.3,1);
+}
+.full-search-tag:hover {
+  transform: translateY(-2px);
+  color: var(--color-primary);
+  box-shadow: var(--neu-extruded);
+}
+.full-search-tag:active {
+  transform: translateY(0);
+  box-shadow: var(--neu-inset);
+}
+
+.full-search-genre-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+@media (min-width: 680px) {
+  .full-search-genre-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.full-search-genre-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: none;
+  background: var(--bg-surface);
+  box-shadow: var(--neu-extruded-sm);
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s cubic-bezier(0.16,1,0.3,1);
+}
+.full-search-genre-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--neu-extruded);
+}
+.full-search-genre-card:active {
+  transform: translateY(0);
+  box-shadow: var(--neu-inset);
+}
+.full-search-genre-card .genre-icon {
+  font-size: 1.4rem;
+  margin-bottom: 6px;
+}
+.full-search-genre-card .genre-name {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--color-text);
+}
+.full-search-genre-card .genre-sub {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
+.full-search-meta-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  padding: 0 4px;
+}
+.full-search-results-title {
+  font-weight: 800;
+  font-size: 1.05rem;
+  color: var(--color-text);
+}
+.full-search-results-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  font-weight: 600;
 }

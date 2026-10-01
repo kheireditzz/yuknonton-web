@@ -41,6 +41,153 @@
   let catalogReq = 0;
   let catalogAbort = null;
 
+  // ── Route & State Persistence (URL Hash + LocalStorage) ────
+  const ROUTE_STORAGE_KEY = 'yn_last_route_v2';
+  let isApplyingRoute = false;
+
+  function serializeRoute(route) {
+    if (!route || route.view === 'home') {
+      if (route && route.category && route.category !== 'trending') {
+        return `#/category/${encodeURIComponent(route.category)}`;
+      }
+      return '#/';
+    }
+    if (route.view === 'watch') {
+      const params = new URLSearchParams();
+      if (route.id) params.set('id', route.id);
+      if (route.type) params.set('type', route.type);
+      if (route.season) params.set('s', route.season);
+      if (route.episode) params.set('ep', route.episode);
+      if (route.title) params.set('title', route.title);
+      return `#/watch?${params.toString()}`;
+    }
+    if (route.view === 'search') {
+      const q = route.query || '';
+      return q ? `#/search?q=${encodeURIComponent(q)}` : '#/search';
+    }
+    if (route.view === 'detail') {
+      const params = new URLSearchParams();
+      if (route.id) params.set('id', route.id);
+      if (route.type) params.set('type', route.type);
+      if (route.title) params.set('title', route.title);
+      return `#/detail?${params.toString()}`;
+    }
+    return '#/';
+  }
+
+  function parseHash(hashStr) {
+    const raw = String(hashStr || '').replace(/^#\/?/, '').trim();
+    if (!raw) return null;
+
+    if (raw.startsWith('category/')) {
+      const cat = decodeURIComponent(raw.replace('category/', ''));
+      return { view: 'home', category: cat };
+    }
+
+    const qIdx = raw.indexOf('?');
+    const path = qIdx >= 0 ? raw.slice(0, qIdx) : raw;
+    const search = qIdx >= 0 ? raw.slice(qIdx + 1) : '';
+    const params = new URLSearchParams(search);
+
+    if (path === 'watch') {
+      const id = params.get('id');
+      if (!id) return null;
+      return {
+        view: 'watch',
+        id,
+        type: params.get('type') || 'movie',
+        season: params.get('s') ? Number(params.get('s')) : null,
+        episode: params.get('ep') ? Number(params.get('ep')) : null,
+        title: params.get('title') || ''
+      };
+    }
+    if (path === 'search') {
+      return {
+        view: 'search',
+        query: params.get('q') || ''
+      };
+    }
+    if (path === 'detail') {
+      const id = params.get('id');
+      if (!id) return null;
+      return {
+        view: 'detail',
+        id,
+        type: params.get('type') || 'movie',
+        title: params.get('title') || ''
+      };
+    }
+    return null;
+  }
+
+  function getCurrentRoute() {
+    const fromHash = parseHash(window.location.hash);
+    if (fromHash) return fromHash;
+
+    try {
+      const stored = localStorage.getItem(ROUTE_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && typeof parsed === 'object') return parsed;
+      }
+    } catch (e) {}
+
+    return { view: 'home', category: 'trending' };
+  }
+
+  function setRoute(route, replace = false) {
+    if (isApplyingRoute) return;
+    try {
+      localStorage.setItem(ROUTE_STORAGE_KEY, JSON.stringify(route));
+    } catch (e) {}
+
+    const newHash = serializeRoute(route);
+    if (window.location.hash !== newHash) {
+      isApplyingRoute = true;
+      if (replace) {
+        history.replaceState(null, '', window.location.pathname + window.location.search + newHash);
+      } else {
+        window.location.hash = newHash;
+      }
+      setTimeout(() => { isApplyingRoute = false; }, 60);
+    }
+  }
+
+  function applyRoute(route) {
+    if (!route) route = { view: 'home', category: activeCategory };
+    if (route.view === 'watch' && route.id) {
+      const sameWatch = String(watchState.id) === String(route.id) &&
+        Number(watchState.episode || 1) === Number(route.episode || 1) &&
+        Number(watchState.season || 1) === Number(route.season || 1) &&
+        currentView === 'watch';
+      if (!sameWatch) {
+        playStream(route.id, route.type, route.season, route.episode, route.title);
+      }
+      return;
+    }
+
+    if (route.view === 'search') {
+      if (currentView === 'watch') closePlayer();
+      openFullSearch(route.query || '');
+      return;
+    }
+
+    if (route.view === 'detail' && route.id) {
+      if (currentView === 'watch') closePlayer();
+      openDetail(route.id, route.title, route.type);
+      return;
+    }
+
+    // Default: home view
+    const overlay = $('#fullSearchOverlay');
+    if (overlay && overlay.style.display !== 'none') closeFullSearch();
+    if (currentView === 'watch') closePlayer();
+    if (route.category && route.category !== activeCategory) {
+      selectCategory(route.category);
+    }
+    if (currentView !== 'home') showView('home');
+  }
+
   function newAbortController() {
     return typeof AbortController !== 'undefined' ? new AbortController() : null;
   }
@@ -303,6 +450,7 @@
   function selectCategory(catId) {
     if (activeCategory === catId) return;
     activeCategory = catId;
+    setRoute({ view: 'home', category: catId });
     $$('#filterTabs .neu-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.cat === catId));
     loadCatalog(catId);
   }
@@ -876,38 +1024,217 @@
     ];
   }
 
-  // ── Search ───────────────────────────────────────────────
-  function startSearch() {
-    const q = $('#searchInput').value.trim();
+  // ── Full-Screen Search Tab Overlay Engine (Tap Full & Bagus) ──
+  let fullSearchReq = 0;
+  let fullSearchAbort = null;
+  let fullSearchScope = 'all';
+  let fullSearchLastResults = [];
+  let fullSearchDebounceTimer = null;
+
+  function openFullSearch(initialQuery = '') {
+    const overlay = $('#fullSearchOverlay');
+    if (!overlay) return;
+    overlay.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+
+    setRoute({ view: 'search', query: initialQuery || '' });
+
+    const input = $('#fullSearchInput');
+    if (input) {
+      input.value = initialQuery || '';
+      setTimeout(() => input.focus(), 80);
+    }
+
+    const clearBtn = $('#fullSearchClearBtn');
+    if (clearBtn) clearBtn.style.display = initialQuery ? '' : 'none';
+
+    if (initialQuery && initialQuery.trim()) {
+      executeFullSearch(initialQuery.trim());
+    } else {
+      showFullSearchDiscovery();
+    }
+  }
+
+  function closeFullSearch() {
+    const overlay = $('#fullSearchOverlay');
+    if (!overlay) return;
+    overlay.style.display = 'none';
+    document.body.style.overflow = '';
+    if (fullSearchAbort) { try { fullSearchAbort.abort(); } catch (e) {} }
+
+    if (watchState.id && currentView === 'watch') {
+      setRoute({
+        view: 'watch',
+        id: watchState.id,
+        type: watchState.type,
+        season: watchState.season,
+        episode: watchState.episode,
+        title: watchState.title
+      });
+    } else {
+      setRoute({ view: 'home', category: activeCategory });
+    }
+  }
+
+  function showFullSearchDiscovery() {
+    const disc = $('#fullSearchDiscovery');
+    const resWrap = $('#fullSearchResultsContainer');
+    if (disc) disc.style.display = 'flex';
+    if (resWrap) resWrap.style.display = 'none';
+  }
+
+  function executeFullSearch(query) {
+    const q = (query || '').trim();
+    const clearBtn = $('#fullSearchClearBtn');
+    if (clearBtn) clearBtn.style.display = q ? '' : 'none';
+
     if (!q) {
-      $('#searchInput').focus();
-      $('#searchInput').classList.add('input-error');
-      setTimeout(() => $('#searchInput').classList.remove('input-error'), 1600);
+      setRoute({ view: 'search', query: '' }, true);
+      showFullSearchDiscovery();
       return;
     }
-    showView('search');
-    if (searchAbort) { try { searchAbort.abort(); } catch (e) {} }
-    searchAbort = newAbortController();
-    const token = ++searchReq;
-    $('#searchResultTitle').textContent = 'Hasil untuk "' + q + '"';
-    $('#searchEmpty').style.display = 'none';
-    const grid = $('#searchResults');
-    grid.innerHTML = renderSkeletonInto(8);
+
+    setRoute({ view: 'search', query: q }, true);
+
+    const input = $('#fullSearchInput');
+    if (input && input.value !== q) input.value = q;
+
+    const disc = $('#fullSearchDiscovery');
+    const resWrap = $('#fullSearchResultsContainer');
+    if (disc) disc.style.display = 'none';
+    if (resWrap) resWrap.style.display = 'block';
+
+    const titleEl = $('#fullSearchResultsTitle');
+    const countEl = $('#fullSearchResultsCount');
+    const grid = $('#fullSearchResultsGrid');
+    if (titleEl) titleEl.textContent = `Hasil untuk "${q}"`;
+    if (countEl) countEl.textContent = 'Mencari...';
+    if (grid) grid.innerHTML = renderSkeletonInto(8);
+
+    if (fullSearchAbort) { try { fullSearchAbort.abort(); } catch (e) {} }
+    fullSearchAbort = newAbortController();
+    const token = ++fullSearchReq;
+
     beginLoading();
-    Api.search(q, signalOf(searchAbort)).then(res => {
-      if (token !== searchReq) return;
-      const items = res.data || [];
-      $('#searchCount').textContent = items.length + ' hasil';
-      grid.innerHTML = '';
-      if (!items.length) {
-        noteInto(grid, 'empty', 'Tidak ada hasil untuk "' + q + '". Coba kata kunci lain atau periksa ejaan.');
-        return;
-      }
-      items.forEach(m => grid.appendChild(renderMovieCard(m)));
+    Api.search(q, signalOf(fullSearchAbort)).then(res => {
+      if (token !== fullSearchReq) return;
+      fullSearchLastResults = res.data || [];
+      renderFullSearchResults();
     }).catch(err => {
-      if (isAbort(err) || token !== searchReq) return;
-      noteInto(grid, 'error', 'Pencarian gagal. Periksa koneksi internet lalu coba lagi.');
+      if (isAbort(err) || token !== fullSearchReq) return;
+      if (grid) noteInto(grid, 'error', 'Pencarian gagal. Periksa koneksi internet lalu coba lagi.');
+      if (countEl) countEl.textContent = 'Gagal';
     }).finally(endLoading);
+  }
+
+  function renderFullSearchResults() {
+    const grid = $('#fullSearchResultsGrid');
+    const countEl = $('#fullSearchResultsCount');
+    if (!grid) return;
+
+    let items = fullSearchLastResults;
+    if (fullSearchScope === 'donghua') {
+      items = items.filter(x => x.provider === 'anichin' || x.type === 'anichin' || String(x.id).startsWith('anichin:'));
+    } else if (fullSearchScope === 'movie') {
+      items = items.filter(x => x.type === 'movie' && !String(x.id).startsWith('anichin:'));
+    } else if (fullSearchScope === 'tv') {
+      items = items.filter(x => x.type === 'tv' && !String(x.id).startsWith('anichin:'));
+    } else if (fullSearchScope === 'horror') {
+      items = items.filter(x => String(x.genre || '').toLowerCase().includes('horor') || String(x.genre || '').toLowerCase().includes('horror'));
+    }
+
+    grid.innerHTML = '';
+    if (countEl) countEl.textContent = `${items.length} ditemukan`;
+
+    if (!items.length) {
+      noteInto(grid, 'empty', 'Tidak ada hasil yang sesuai dengan filter ini. Coba pilih kategori lain atau ubah kata kunci.');
+      return;
+    }
+
+    items.forEach(m => {
+      const card = renderMovieCard(m);
+      card.addEventListener('click', () => {
+        closeFullSearch();
+      }, true);
+      grid.appendChild(card);
+    });
+  }
+
+  function setupFullSearchEvents() {
+    const input = $('#fullSearchInput');
+    const clearBtn = $('#fullSearchClearBtn');
+    const backBtn = $('#fullSearchBackBtn');
+    const submitBtn = $('#fullSearchSubmitBtn');
+
+    if (input) {
+      input.addEventListener('input', () => {
+        const val = input.value;
+        if (clearBtn) clearBtn.style.display = val ? '' : 'none';
+        clearTimeout(fullSearchDebounceTimer);
+        fullSearchDebounceTimer = setTimeout(() => {
+          executeFullSearch(val);
+        }, 280);
+      });
+
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          clearTimeout(fullSearchDebounceTimer);
+          executeFullSearch(input.value);
+        }
+      });
+    }
+
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => {
+        if (input) {
+          input.value = '';
+          input.focus();
+        }
+        clearBtn.style.display = 'none';
+        showFullSearchDiscovery();
+      });
+    }
+
+    if (backBtn) backBtn.addEventListener('click', closeFullSearch);
+    if (submitBtn) submitBtn.addEventListener('click', () => {
+      if (input) executeFullSearch(input.value);
+    });
+
+    // Trending quick tags
+    $$('#fullSearchTrendingTags .full-search-tag').forEach(tag => {
+      tag.addEventListener('click', () => {
+        const q = tag.dataset.query;
+        if (q) executeFullSearch(q);
+      });
+    });
+
+    // Genre cards
+    $$('.full-search-genre-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const genre = card.dataset.genre;
+        if (genre) executeFullSearch(genre);
+      });
+    });
+
+    // Scope filter chips
+    $$('#fullSearchFilters .full-search-filter-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        $$('#fullSearchFilters .full-search-filter-chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        fullSearchScope = chip.dataset.scope || 'all';
+        renderFullSearchResults();
+      });
+    });
+  }
+
+  // ── Legacy In-Page Search ─────────────────────────────────
+  function startSearch() {
+    const q = $('#searchInput')?.value.trim();
+    if (!q) {
+      openFullSearch();
+      return;
+    }
+    openFullSearch(q);
   }
 
   function renderSkeletonInto(n) {
@@ -942,6 +1269,15 @@
     watchState.myVote = 0;
     watchState.myRating = 0;
 
+    setRoute({
+      view: 'watch',
+      id,
+      type: type || 'movie',
+      season: season || null,
+      episode: episode || null,
+      title: title || ''
+    });
+
     Api.movie(id, type, signal).then(res => {
       if (!isWatchActive(token)) return;
       watchState.detail = res.data || null;
@@ -957,6 +1293,8 @@
       $('#watchEpisodes').style.display = 'none';
       episodeStripData = { id: null, season: null, episodes: [] };
     }
+
+    loadWatchRelated(id, watchState.type, token, signal);
 
     try {
       const res = await Api.play(id, type, season, episode, signal);
@@ -1095,6 +1433,7 @@
   }
 
   function resetPlayerUI(title) {
+    if (window.__clearIndicatorUI) window.__clearIndicatorUI();
     const iframe = $('#playerIframe');
     if (iframe) {
       iframe.src = 'about:blank';
@@ -1122,10 +1461,19 @@
     $('#watchMeta').innerHTML = '';
     $('#watchAvatarImg').src = '/img/no-poster.svg';
     closeQualityMenu();
-    $('#qualityPicker').style.display = 'none';
+    const qPicker = $('#qualityPicker');
+    if (qPicker) qPicker.style.display = 'none';
     $('#watchEpisodes').style.display = 'none';
     $('#watchEpsScroll').innerHTML = '';
+    const epBadge = $('#watchEpCurrentBadge');
+    if (epBadge) epBadge.textContent = 'Ep 1';
+    const epTotal = $('#watchEpTotalCount');
+    if (epTotal) epTotal.textContent = '0 Episode';
     episodeStripData = { id: null, season: null, episodes: [] };
+    const relBox = $('#watchRelated');
+    if (relBox) relBox.style.display = 'none';
+    const relStrip = $('#watchRelatedStrip');
+    if (relStrip) relStrip.innerHTML = '';
   }
 
   function setupQualities(stream) {
@@ -1135,18 +1483,27 @@
       .sort((a, b) => parseInt(b, 10) - parseInt(a, 10));
     watchState.qualities = q;
 
-    const menu = $('#qualityMenu');
-    menu.innerHTML = '';
-    $('#qualityLabel').textContent = 'Auto';
-
-    if (!keys.length && !stream.playlist) {
-      watchState.qualityKey = null;
-      menu.innerHTML = `<div class="quality-empty">Resolusi unduhan belum tersedia untuk judul ini.</div>`;
-      $('#qualityPicker').style.display = '';
+    const qPicker = $('#qualityPicker');
+    if (!qPicker) {
+      if (keys.length) {
+        watchState.qualityKey = stream.playlist ? 'auto' : keys[0];
+      }
       return;
     }
 
-    if (stream.playlist) {
+    const menu = $('#qualityMenu');
+    if (menu) menu.innerHTML = '';
+    const qLabel = $('#qualityLabel');
+    if (qLabel) qLabel.textContent = 'Auto';
+
+    if (!keys.length && !stream.playlist) {
+      watchState.qualityKey = null;
+      if (menu) menu.innerHTML = `<div class="quality-empty">Pilihan belum tersedia untuk judul ini.</div>`;
+      qPicker.style.display = 'none';
+      return;
+    }
+
+    if (stream.playlist && menu) {
       const auto = document.createElement('button');
       auto.type = 'button';
       auto.className = 'quality-item quality-play' + (keys.length ? '' : ' active');
@@ -1157,38 +1514,29 @@
       if (!keys.length) watchState.qualityKey = 'auto';
     }
 
-    keys.forEach((k, i) => {
-      const isDefault = !stream.playlist && i === 0;
-      const row = document.createElement('div');
-      row.className = 'quality-row';
+    if (menu) {
+      keys.forEach((k, i) => {
+        const isDefault = !stream.playlist && i === 0;
+        const row = document.createElement('div');
+        row.className = 'quality-row';
 
-      const play = document.createElement('button');
-      play.type = 'button';
-      play.className = 'quality-item quality-play' + (isDefault ? ' active' : '');
-      play.dataset.key = k;
-      play.innerHTML = `<span class="quality-item-res">${escapeHtml(k)}p</span><span class="quality-item-sub">Putar</span>`;
-      play.addEventListener('click', () => selectQuality(k));
-      row.appendChild(play);
+        const play = document.createElement('button');
+        play.type = 'button';
+        play.className = 'quality-item quality-play' + (isDefault ? ' active' : '');
+        play.dataset.key = k;
+        play.innerHTML = `<span class="quality-item-res">${escapeHtml(k)}p</span><span class="quality-item-sub">Putar</span>`;
+        play.addEventListener('click', () => selectQuality(k));
+        row.appendChild(play);
 
-      const dl = document.createElement('a');
-      dl.className = 'quality-dl';
-      dl.href = '/proxy/hls?url=' + encodeURIComponent(q[k]);
-      dl.setAttribute('download', '');
-      dl.target = '_blank';
-      dl.rel = 'noopener';
-      dl.title = `Unduh ${k}p`;
-      dl.setAttribute('aria-label', `Unduh ${k}p`);
-      dl.innerHTML = icon('download', 15, 2.3);
-      row.appendChild(dl);
-
-      menu.appendChild(row);
-    });
+        menu.appendChild(row);
+      });
+    }
 
     if (keys.length) {
       watchState.qualityKey = stream.playlist ? 'auto' : keys[0];
     }
-    $('#qualityLabel').textContent = watchState.qualityKey === 'auto' ? 'Auto' : watchState.qualityKey + 'p';
-    $('#qualityPicker').style.display = '';
+    if (qLabel) qLabel.textContent = watchState.qualityKey === 'auto' ? 'Auto' : watchState.qualityKey + 'p';
+    qPicker.style.display = 'none';
   }
 
   function proxySrc(u) { return '/proxy/hls?url=' + encodeURIComponent(u); }
@@ -1216,7 +1564,10 @@
       if (typeof onFatal === 'function') onFatal();
     };
     video.addEventListener('error', onError);
-    video.addEventListener('loadedmetadata', hide, { once: true });
+    video.addEventListener('loadedmetadata', () => {
+      attemptResumePlayback(video);
+      hide();
+    }, { once: true });
     video.addEventListener('playing', hide, { once: true });
     video.src = url;
     video.play().catch(() => {});
@@ -1292,6 +1643,7 @@
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         if (stale()) return;
         $('#playerStatus').style.display = 'none';
+        attemptResumePlayback(video);
         video.play().catch(() => {});
       });
       hls.on(Hls.Events.ERROR, (evt, data) => {
@@ -1311,7 +1663,12 @@
       });
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
       video.src = '/proxy/hls?url=' + encodeURIComponent(playlistUrl);
-      video.addEventListener('loadeddata', () => { if (!stale()) $('#playerStatus').style.display = 'none'; }, { once: true });
+      video.addEventListener('loadeddata', () => {
+        if (!stale()) {
+          $('#playerStatus').style.display = 'none';
+          attemptResumePlayback(video);
+        }
+      }, { once: true });
       video.play().catch(() => {});
     } else {
       $('#playerError').style.display = '';
@@ -1343,17 +1700,46 @@
     return rec && typeof rec.r === 'number' ? rec.r : 0;
   }
   function setWatchProgress() {
-    const isAni = watchState.type === 'anichin' || String(watchState.id).startsWith('anichin:');
-    if ((watchState.type !== 'tv' && !isAni) || !watchState.id || !watchState.episode) return;
+    if (!watchState.id) return;
     const video = $('#playerVideo');
+    if (!video) return;
     const dur = video.duration;
     if (!dur || !isFinite(dur) || dur <= 0) return;
     const ratio = Math.max(0, Math.min(1, video.currentTime / dur));
     const store = loadProgressStore();
-    store[progressKey(watchState.id, watchState.season || 1, watchState.episode)] = {
+    const isAni = watchState.type === 'anichin' || String(watchState.id).startsWith('anichin:');
+    const isSeries = watchState.type === 'tv' || isAni;
+    const s = isSeries ? (watchState.season || 1) : 'movie';
+    const ep = isSeries ? (watchState.episode || 1) : 1;
+    store[progressKey(watchState.id, s, ep)] = {
       r: ratio, t: video.currentTime, d: dur, at: Date.now()
     };
     saveProgressStore(store);
+  }
+
+  function attemptResumePlayback(video) {
+    if (!video || !watchState.id) return;
+    const isAni = watchState.type === 'anichin' || String(watchState.id).startsWith('anichin:');
+    const isSeries = watchState.type === 'tv' || isAni;
+    const s = isSeries ? (watchState.season || 1) : 'movie';
+    const ep = isSeries ? (watchState.episode || 1) : 1;
+    const key = progressKey(watchState.id, s, ep);
+    const rec = loadProgressStore()[key];
+    if (rec && typeof rec.t === 'number' && rec.t > 3 && rec.r < 0.95) {
+      const targetTime = rec.t;
+      const doSeek = () => {
+        try {
+          if (Math.abs(video.currentTime - targetTime) > 2) {
+            video.currentTime = targetTime;
+          }
+        } catch (e) {}
+      };
+      if (video.readyState >= 1) {
+        doSeek();
+      } else {
+        video.addEventListener('loadedmetadata', doSeek, { once: true });
+      }
+    }
   }
 
   function updateEpisodeBars() {
@@ -1385,6 +1771,11 @@
     const scroll = $('#watchEpsScroll');
     wrap.style.display = '';
 
+    const curBadge = $('#watchEpCurrentBadge');
+    if (curBadge) curBadge.textContent = 'Ep ' + (episode || 1);
+    const totalCount = $('#watchEpTotalCount');
+    if (totalCount) totalCount.textContent = 'Memuat...';
+
     const cacheKey = id + ':' + (season || 1);
     let eps = episodeCache.get(cacheKey);
     if (!eps) {
@@ -1404,6 +1795,7 @@
 
     episodeStripData = { id, season: season || 1, episodes: eps };
     if (!eps.length) { wrap.style.display = 'none'; return; }
+    if (totalCount) totalCount.textContent = eps.length + ' Episode';
     scroll.innerHTML = '';
     eps.forEach(ep => {
       const epNum = ep.episode || ep.episode_number || 1;
@@ -1412,7 +1804,7 @@
       chip.className = 'watch-ep-chip' + (Number(epNum) === Number(episode) ? ' active' : '');
       chip.dataset.ep = epNum;
       chip.title = 'Episode ' + epNum;
-      chip.innerHTML = `<span class="watch-ep-chip-num">${epNum}</span><span class="watch-ep-chip-bar"></span>`;
+      chip.innerHTML = `<span class="watch-ep-chip-prefix">EP</span><span class="watch-ep-chip-num">${epNum}</span><span class="watch-ep-chip-bar"></span>`;
       chip.addEventListener('click', () => {
         if (Number(epNum) === Number(watchState.episode)) return;
         playStream(id, watchState.type, season || 1, epNum, stripTitleFor(epNum));
@@ -1468,6 +1860,131 @@
 
 
 
+  // ── Rekomendasi Pilihan Hari Ini (Slider Film/Tayangan Berganti Tiap Hari) ──
+  async function loadWatchRelated(currentId, currentType, token, signal) {
+    const wrap = $('#watchRelated');
+    const strip = $('#watchRelatedStrip');
+    if (!wrap || !strip) return;
+
+    wrap.style.display = '';
+    strip.innerHTML = `
+      <div class="watch-related-loading">
+        <span class="player-spin">${icon('loader', 16, 2.3)}</span> Menyiapkan tayangan pilihan hari ini...
+      </div>`;
+
+    try {
+      const isAni = currentType === 'anichin' || String(currentId).startsWith('anichin:');
+      let candidates = [];
+
+      if (isAni) {
+        const [pop, ongoing] = await Promise.allSettled([
+          Api.catalog('donghua-populer', 1),
+          Api.catalog('donghua-ongoing', 1)
+        ]);
+        const listA = (pop.status === 'fulfilled' && pop.value && pop.value.data) || [];
+        const listB = (ongoing.status === 'fulfilled' && ongoing.value && ongoing.value.data) || [];
+        candidates = [...listA, ...listB];
+      } else {
+        const [trend, top, indo] = await Promise.allSettled([
+          Api.catalog('trending', 1),
+          Api.catalog('top-100', 1),
+          Api.catalog('film-indonesia', 1)
+        ]);
+        const listA = (trend.status === 'fulfilled' && trend.value && trend.value.data) || [];
+        const listB = (top.status === 'fulfilled' && top.value && top.value.data) || [];
+        const listC = (indo.status === 'fulfilled' && indo.value && indo.value.data) || [];
+        candidates = [...listA, ...listB, ...listC];
+      }
+
+      if (!isWatchActive(token)) return;
+
+      const seen = new Set();
+      const valid = [];
+      const currStr = String(currentId).toLowerCase();
+      candidates.forEach(it => {
+        if (!it || !it.id) return;
+        const idStr = String(it.id).toLowerCase();
+        if (idStr === currStr) return;
+        if (seen.has(idStr)) return;
+        seen.add(idStr);
+        valid.push(it);
+      });
+
+      if (!valid.length) {
+        wrap.style.display = 'none';
+        return;
+      }
+
+      // Algoritma rotasi harian deterministik berdasarkan tanggal hari ini
+      const now = new Date();
+      const daySeed = (now.getFullYear() * 372) + ((now.getMonth() + 1) * 31) + now.getDate();
+      const offset = daySeed % valid.length;
+      const dailyRotated = [...valid.slice(offset), ...valid.slice(0, offset)].slice(0, 16);
+
+      strip.innerHTML = '';
+      dailyRotated.forEach(item => {
+        const card = renderRelatedCard(item);
+        if (card) strip.appendChild(card);
+      });
+    } catch (e) {
+      if (isAbort(e) || !isWatchActive(token)) return;
+      wrap.style.display = 'none';
+    }
+  }
+
+  function renderRelatedCard(item) {
+    if (!item || !item.id) return null;
+    const card = document.createElement('div');
+    card.className = 'related-card';
+    card.setAttribute('role', 'button');
+    card.setAttribute('tabindex', '0');
+
+    const poster = item.poster ? posterUrl(item.poster) : '/img/no-poster.svg';
+    const title = item.title || item.name || 'Tanpa Judul';
+    const rating = Number(item.rating || item.vote_average || 0);
+    const year = extractYear(item.release_date || item.release || item.first_air_date || '');
+    const isAni = item.type === 'anichin' || String(item.id).startsWith('anichin:');
+    const badgeLabel = isAni ? 'Donghua' : (item.type === 'tv' ? 'Serial' : 'Film');
+
+    card.innerHTML = `
+      <div class="related-card-poster-wrap">
+        <img class="related-card-img" src="${poster}" alt="${escapeHtml(title)}" loading="lazy" onerror="this.onerror=null;this.src='/img/no-poster.svg';">
+        <span class="related-card-badge">${escapeHtml(badgeLabel)}</span>
+        <div class="related-card-play-overlay">
+          <span class="related-card-play-btn">
+            ${icon('play', 16, 2.5)}
+          </span>
+        </div>
+      </div>
+      <div class="related-card-info">
+        <div class="related-card-title" title="${escapeHtml(title)}">${escapeHtml(title)}</div>
+        <div class="related-card-meta">
+          ${rating > 0 ? `<span class="related-card-rating">${icon('star', 11, 2.3)} ${rating.toFixed(1)}</span>` : ''}
+          ${year ? `<span class="related-card-year">${escapeHtml(year)}</span>` : ''}
+        </div>
+      </div>
+    `;
+
+    const handleAction = () => {
+      const targetType = isAni ? 'anichin' : (item.type || 'movie');
+      playStream(item.id, targetType, 1, 1, title);
+      const stage = $('#watchStage');
+      if (stage && stage.scrollIntoView) {
+        stage.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    };
+
+    card.addEventListener('click', handleAction);
+    card.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        handleAction();
+      }
+    });
+
+    return card;
+  }
+
   function closePlayer() {
     setWatchProgress();
     closeQualityMenu();
@@ -1488,36 +2005,58 @@
     if (servers) servers.style.display = 'none';
     const serverList = $('#watchServersList');
     if (serverList) serverList.innerHTML = '';
+    const relBox = $('#watchRelated');
+    if (relBox) relBox.style.display = 'none';
+    const relStrip = $('#watchRelatedStrip');
+    if (relStrip) relStrip.innerHTML = '';
     watchState.id = null;
     watchState.myVote = 0;
     watchState.myRating = 0;
+    setRoute({ view: 'home', category: activeCategory });
     showView(returnView || 'home');
   }
 
   function toggleQualityMenu() {
     const menu = $('#qualityMenu');
+    if (!menu) return;
     const open = menu.classList.toggle('open');
-    $('#qualityPicker').classList.toggle('menu-open', open);
+    const picker = $('#qualityPicker');
+    if (picker) picker.classList.toggle('menu-open', open);
   }
   function closeQualityMenu() {
-    $('#qualityMenu').classList.remove('open');
-    $('#qualityPicker').classList.remove('menu-open');
+    const menu = $('#qualityMenu');
+    if (menu) menu.classList.remove('open');
+    const picker = $('#qualityPicker');
+    if (picker) picker.classList.remove('menu-open');
   }
 
   // ── Events ───────────────────────────────────────────────
   function wireEvents() {
+    setupFullSearchEvents();
+
     $('#headerLogo').addEventListener('click', () => {
-      if (currentView !== 'home') loadHome();
+      const fullSearch = $('#fullSearchOverlay');
+      if (fullSearch && fullSearch.style.display !== 'none') closeFullSearch();
+      if (currentView === 'watch') closePlayer();
+      setRoute({ view: 'home', category: 'trending' });
+      activeCategory = 'trending';
+      loadCatalog('trending');
+      $$('#filterTabs .neu-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.cat === 'trending'));
       showView('home');
     });
 
-    $('#searchBtn').addEventListener('click', startSearch);
-    $('#searchInput').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') startSearch();
-    });
-    $('#headerSearchBtn').addEventListener('click', () => {
-      showView('home');
-      setTimeout(() => $('#searchInput').focus(), 60);
+    const homeInput = $('#searchInput');
+    if (homeInput) {
+      homeInput.addEventListener('click', () => openFullSearch(homeInput.value));
+      homeInput.addEventListener('focus', () => openFullSearch(homeInput.value));
+      homeInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') startSearch();
+      });
+    }
+
+    $('#searchBtn')?.addEventListener('click', startSearch);
+    $('#headerSearchBtn')?.addEventListener('click', () => {
+      openFullSearch(homeInput?.value || '');
     });
 
     $('#headerRefreshBtn').addEventListener('click', () => {
@@ -1528,18 +2067,92 @@
 
     $('#playerBackBtn').addEventListener('click', () => { closePlayer(); });
 
-    // Progres tontonan untuk strip episode (throttle 4s + saat jeda/selesai)
+    $('#watchEpNavPrev')?.addEventListener('click', () => {
+      const sc = $('#watchEpsScroll');
+      if (sc) sc.scrollBy({ left: -260, behavior: 'smooth' });
+    });
+    $('#watchEpNavNext')?.addEventListener('click', () => {
+      const sc = $('#watchEpsScroll');
+      if (sc) sc.scrollBy({ left: 260, behavior: 'smooth' });
+    });
+    $('#watchRelatedPrev')?.addEventListener('click', () => {
+      const st = $('#watchRelatedStrip');
+      if (st) st.scrollBy({ left: -320, behavior: 'smooth' });
+    });
+    $('#watchRelatedNext')?.addEventListener('click', () => {
+      const st = $('#watchRelatedStrip');
+      if (st) st.scrollBy({ left: 320, behavior: 'smooth' });
+    });
+
+    // Progres tontonan untuk strip episode (throttle 3s + saat jeda/selesai)
     let lastProgressSave = 0;
     const playerVideo = $('#playerVideo');
     playerVideo.addEventListener('timeupdate', () => {
       const now = Date.now();
-      if (now - lastProgressSave < 4000) return;
+      if (now - lastProgressSave < 3000) return;
       lastProgressSave = now;
       setWatchProgress();
       updateEpisodeBars();
     });
     playerVideo.addEventListener('pause', () => { setWatchProgress(); updateEpisodeBars(); });
     playerVideo.addEventListener('ended', () => { setWatchProgress(); updateEpisodeBars(); });
+
+    // ── Auto-hide kontrol: tombol kembali & overlay muncul saat jeda/disentuh ──
+    const playerWrap = $('#watchVideoWrap');
+    const stateIndicator = $('#playerStateIndicator');
+    let hideControlsTimer = null;
+
+    function revealControls(temporary) {
+      if (!playerWrap) return;
+      playerWrap.classList.remove('controls-hidden');
+      clearTimeout(hideControlsTimer);
+      if (temporary && !playerVideo.paused && !playerVideo.ended) {
+        hideControlsTimer = setTimeout(() => {
+          if (!playerVideo.paused && !playerVideo.ended) playerWrap.classList.add('controls-hidden');
+        }, 3000);
+      }
+    }
+
+    function setPausedUI() {
+      if (!playerWrap || !stateIndicator) return;
+      clearTimeout(hideControlsTimer);
+      stateIndicator.classList.remove('is-anim-play');
+      stateIndicator.classList.add('is-paused');
+      playerWrap.classList.remove('controls-hidden');
+    }
+
+    function setPlayingUI(pulse) {
+      if (!playerWrap || !stateIndicator) return;
+      stateIndicator.classList.remove('is-paused');
+      playerWrap.classList.add('controls-hidden');
+      clearTimeout(hideControlsTimer);
+      if (pulse) {
+        void stateIndicator.offsetWidth;
+        stateIndicator.classList.add('is-anim-play');
+        setTimeout(() => stateIndicator.classList.remove('is-anim-play'), 700);
+      }
+    }
+
+    function clearIndicatorUI() {
+      if (!playerWrap || !stateIndicator) return;
+      clearTimeout(hideControlsTimer);
+      stateIndicator.classList.remove('is-paused', 'is-anim-play');
+      playerWrap.classList.remove('controls-hidden');
+    }
+
+    playerVideo.addEventListener('play', () => setPlayingUI(true));
+    playerVideo.addEventListener('pause', setPausedUI);
+    playerVideo.addEventListener('ended', setPausedUI);
+    stateIndicator.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (playerVideo.paused || playerVideo.ended) playerVideo.play();
+    });
+    ['touchstart', 'mousemove'].forEach((ev) => {
+      playerVideo.addEventListener(ev, () => {
+        if (!playerVideo.paused && !playerVideo.ended) revealControls(true);
+      }, { passive: true });
+    });
+    window.__clearIndicatorUI = clearIndicatorUI;
 
     // Fullscreen pemutar → paksa orientasi landscape agar tidak terkunci portrait
     const applyOrientation = (landscape) => {
@@ -1557,29 +2170,92 @@
     playerVideo.addEventListener('webkitbeginfullscreen', () => applyOrientation(true));
     playerVideo.addEventListener('webkitendfullscreen', () => applyOrientation(false));
 
-    $('#qualityToggle').addEventListener('click', (e) => {
+    $('#qualityToggle')?.addEventListener('click', (e) => {
       e.stopPropagation();
       toggleQualityMenu();
     });
     document.addEventListener('click', (e) => {
-      if (!e.target.closest('#qualityPicker')) closeQualityMenu();
+      const picker = $('#qualityPicker');
+      if (picker && !e.target.closest('#qualityPicker')) closeQualityMenu();
     });
 
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
-        if ($('#qualityMenu').classList.contains('open')) { closeQualityMenu(); return; }
+        const fullSearch = $('#fullSearchOverlay');
+        if (fullSearch && fullSearch.style.display !== 'none') {
+          closeFullSearch();
+          return;
+        }
+        const menu = $('#qualityMenu');
+        if (menu && menu.classList.contains('open')) { closeQualityMenu(); return; }
         if (currentView === 'watch') closePlayer();
+      } else if (e.key === '/' && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
+        e.preventDefault();
+        openFullSearch();
       }
     });
 
-    window.__goHome = () => { showView('home'); };
+    window.addEventListener('hashchange', () => {
+      if (isApplyingRoute) return;
+      const r = parseHash(window.location.hash) || { view: 'home', category: activeCategory };
+      applyRoute(r);
+    });
+
+    window.addEventListener('beforeunload', () => {
+      setWatchProgress();
+    });
+
+    window.addEventListener('scroll', () => {
+      if (currentView === 'home') {
+        try { sessionStorage.setItem('yn_home_scrollY', String(Math.round(window.scrollY))); } catch (e) {}
+      }
+    }, { passive: true });
+
+    window.__goHome = () => {
+      closePlayer();
+      showView('home');
+    };
     window.__retryLast = () => {
       playStream(watchState.id, watchState.type, watchState.season, watchState.episode, watchState.title);
     };
   }
 
   // ── Boot ────────────────────────────────────────────────
-  loadHome();
-  wireEvents();
-  showView('home');
+  async function boot() {
+    wireEvents();
+
+    const initialRoute = getCurrentRoute();
+    if (initialRoute.category) {
+      activeCategory = initialRoute.category;
+    }
+
+    // Preload home catalog & rows in background so home is ready when exiting watch/search
+    loadHome().then(() => {
+      if (initialRoute.view === 'home') {
+        try {
+          const sy = Number(sessionStorage.getItem('yn_home_scrollY'));
+          if (sy > 0) window.scrollTo({ top: sy, behavior: 'auto' });
+        } catch (e) {}
+      }
+    });
+
+    if (initialRoute.view === 'watch' && initialRoute.id) {
+      playStream(
+        initialRoute.id,
+        initialRoute.type,
+        initialRoute.season,
+        initialRoute.episode,
+        initialRoute.title
+      );
+    } else if (initialRoute.view === 'search') {
+      showView('home');
+      openFullSearch(initialRoute.query || '');
+    } else if (initialRoute.view === 'detail' && initialRoute.id) {
+      openDetail(initialRoute.id, initialRoute.title, initialRoute.type);
+    } else {
+      showView('home');
+    }
+  }
+
+  boot();
 })();
