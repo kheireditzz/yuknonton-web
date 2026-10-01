@@ -336,83 +336,45 @@ export async function handleApiRoute(req, res, pathname, parsedUrl) {
     if (id.startsWith('anichin:') || type === 'anichin') {
       try {
         let targetEpSlug = episode;
+        const cleanId = id.replace(/^anichin:/, '').replace(/^\/|\/$/g, '');
+
         // If episode param is empty, an index, or number, find slug from detail
         if (!targetEpSlug || /^\d+$/.test(String(targetEpSlug).trim())) {
           const detail = await getAnichinDetail(id);
           const epNum = targetEpSlug ? parseInt(targetEpSlug, 10) : 1;
-          const matched = (detail.episodes || []).find(e => e.episode_number === epNum) || detail.episodes?.[0];
-          targetEpSlug = matched ? matched.slug : id.replace(/^anichin:/, '');
+          const matched = (detail.episodes || []).find(e => Number(e.episode) === epNum) || detail.episodes?.[0];
+          targetEpSlug = matched ? matched.slug : cleanId;
         }
 
-        const stream = await resolveAnichinStream(targetEpSlug).catch(() => null);
-        if (stream && (stream.mp4 || stream.playlist || stream.embed)) {
-          res.setHeader('Cache-Control', 'public, max-age=300');
-          res.writeHead(200);
-          res.end(JSON.stringify({
-            id,
-            type: 'anichin',
-            playlist: {
-              source: 'anichin',
-              playlist: stream.playlist,
-              mp4: stream.mp4,
-              qualities: stream.qualities || {},
-              mirrors: stream.mirrors || [],
-              embed: stream.embed || null,
-              captions: []
-            },
-            season: 1,
-            episode: targetEpSlug
-          }));
+        const stream = await resolveAnichinStream(targetEpSlug);
+        if (!stream || (!stream.mp4 && !stream.playlist && !stream.embed)) {
+          res.setHeader('Cache-Control', 'no-store');
+          res.writeHead(404);
+          res.end(JSON.stringify({ error: 'Sumber video belum tersedia untuk episode ini.', id, episode: targetEpSlug }));
           return;
         }
 
-        // Fallback: Embed via Anichin web player if direct stream extraction was blocked
-        const cleanSlug = targetEpSlug || id.replace(/^anichin:/, '');
-        const finalEpSlug = cleanSlug.includes('episode') ? cleanSlug : `${cleanSlug}-episode-01-subtitle-indonesia`;
-        res.setHeader('Cache-Control', 'public, max-age=180');
+        res.setHeader('Cache-Control', 'public, max-age=300');
         res.writeHead(200);
         res.end(JSON.stringify({
           id,
           type: 'anichin',
           playlist: {
             source: 'anichin',
-            playlist: null,
-            mp4: null,
-            qualities: {},
-            embed: `https://anichin.tv/${finalEpSlug}/`,
-            mirrors: [
-              { name: 'Anichin Player (Sub Indo)', url: `https://anichin.tv/${finalEpSlug}/` },
-              { name: 'Anichin Moe', url: `https://anichin.moe/${finalEpSlug}/` }
-            ],
+            playlist: stream.playlist || null,
+            mp4: stream.mp4 || null,
+            qualities: stream.qualities || {},
+            mirrors: stream.mirrors || [],
+            embed: stream.embed || null,
             captions: []
           },
           season: 1,
-          episode: finalEpSlug
+          episode: targetEpSlug
         }));
       } catch (err) {
         console.error('[Anichin] Stream error:', err);
-        const cleanSlug = id.replace(/^anichin:/, '');
-        const finalEpSlug = cleanSlug.includes('episode') ? cleanSlug : `${cleanSlug}-episode-01-subtitle-indonesia`;
-        res.setHeader('Cache-Control', 'public, max-age=180');
-        res.writeHead(200);
-        res.end(JSON.stringify({
-          id,
-          type: 'anichin',
-          playlist: {
-            source: 'anichin',
-            playlist: null,
-            mp4: null,
-            qualities: {},
-            embed: `https://anichin.tv/${finalEpSlug}/`,
-            mirrors: [
-              { name: 'Anichin Player (Sub Indo)', url: `https://anichin.tv/${finalEpSlug}/` },
-              { name: 'Anichin Moe', url: `https://anichin.moe/${finalEpSlug}/` }
-            ],
-            captions: []
-          },
-          season: 1,
-          episode: finalEpSlug
-        }));
+        res.writeHead(500);
+        res.end(JSON.stringify({ error: 'Gagal memuat video episode ini.', message: err.message }));
       }
       return;
     }

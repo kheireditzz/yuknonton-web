@@ -187,33 +187,150 @@ export function extractSeriesSlug(slug) {
 /**
  * Get detailed information for an Anichin Donghua series
  */
+/**
+ * Parse all episodes of a series from HTML (supports episode page, archive page, and legacy formats)
+ */
+function parseEpisodesFromHtml(html, defaultPoster = '') {
+  const episodes = [];
+  const seenSlugs = new Set();
+
+  // Pattern 1: class="episodelist" or class="eplister" (Anichin series & episode pages)
+  const epListMatch = html.match(/class="[^"]*(?:episodelist|eplister)[^"]*"[\s\S]*?<\/ul>/i);
+  if (epListMatch) {
+    const liRegex = /<li[^>]*>([\s\S]*?)<\/li>/gi;
+    let m;
+    while ((m = liRegex.exec(epListMatch[0])) !== null) {
+      const li = m[1];
+      const hrefMatch = li.match(/href="([^"]+)"/i);
+      if (!hrefMatch) continue;
+      const slug = hrefMatch[1].replace(/^https?:\/\/[^\/]+/, '').replace(/^\/|\/$/g, '');
+      if (seenSlugs.has(slug)) continue;
+      seenSlugs.add(slug);
+
+      const numMatch = slug.match(/episode-(\d+)/i) || li.match(/class="epl-num">(\d+)</i);
+      const epNum = numMatch ? parseInt(numMatch[1], 10) : (episodes.length + 1);
+      const titleMatch = li.match(/title="([^"]+)"/i) || li.match(/class="epl-title">([^<]+)</i);
+      const epTitle = titleMatch ? titleMatch[1].trim() : ('Episode ' + epNum);
+
+      const imgMatch = li.match(/src="([^"]+)"/i);
+      const still = imgMatch ? imgMatch[1] : defaultPoster;
+
+      episodes.push({
+        id: 'anichin:' + slug,
+        slug,
+        episode: epNum,
+        episode_number: epNum,
+        name: epTitle,
+        title: epTitle,
+        still_path: still
+      });
+    }
+  }
+
+  // Pattern 2: class="listupd" cards on archive pages (Anichin)
+  if (!episodes.length) {
+    const bRegex = /<div class="bsx">([\s\S]*?)<\/div>\s*<\/div>/gi;
+    let m;
+    while ((m = bRegex.exec(html)) !== null) {
+      const card = m[1];
+      const linkMatch = card.match(/<a[^>]*href="([^"]+)"[^>]*title="([^"]+)"/i);
+      if (!linkMatch) continue;
+      const slug = linkMatch[1].replace(/^https?:\/\/[^\/]+/, '').replace(/^\/|\/$/g, '');
+      if (seenSlugs.has(slug)) continue;
+      seenSlugs.add(slug);
+
+      const numMatch = slug.match(/episode-(\d+)/i) || card.match(/<span class="epx">.*?(\d+).*?<\/span>/i);
+      const epNum = numMatch ? parseInt(numMatch[1], 10) : (episodes.length + 1);
+      const cardTitle = linkMatch[2].trim() || ('Episode ' + epNum);
+
+      episodes.push({
+        id: 'anichin:' + slug,
+        slug,
+        episode: epNum,
+        episode_number: epNum,
+        name: cardTitle,
+        title: cardTitle,
+        still_path: defaultPoster
+      });
+    }
+  }
+
+  // Pattern 3: class="eplister" (legacy Anichin theme)
+  if (!episodes.length) {
+    const ulMatch = html.match(/<div[^>]*class="[^"]*eplister[^"]*"[^>]*>[\s\S]*?<ul>([\s\S]*?)<\/ul>/i);
+    if (ulMatch) {
+      const liRegex = /<li[^>]*>([\s\S]*?)<\/li>/gi;
+      let lm;
+      while ((lm = liRegex.exec(ulMatch[1])) !== null) {
+        const li = lm[1];
+        const href = (li.match(/href="([^"]+)"/i) || [])[1];
+        if (!href) continue;
+        const slug = href.replace(/^https?:\/\/[^\/]+/, '').replace(/^\/|\/$/g, '');
+        if (seenSlugs.has(slug)) continue;
+        seenSlugs.add(slug);
+        const numStr = (li.match(/class="epl-num">([^<]+)</i) || [])[1];
+        const epNum = numStr ? parseInt(numStr, 10) : (episodes.length + 1);
+        const epTitle = (li.match(/class="epl-title">([^<]+)</i) || [])[1] || ('Episode ' + epNum);
+        episodes.push({
+          id: 'anichin:' + slug,
+          slug,
+          episode: isNaN(epNum) ? episodes.length + 1 : epNum,
+          episode_number: isNaN(epNum) ? episodes.length + 1 : epNum,
+          name: epTitle,
+          title: epTitle,
+          still_path: defaultPoster
+        });
+      }
+    }
+  }
+
+  episodes.sort((a, b) => a.episode - b.episode);
+  return episodes;
+}
+
+/**
+ * Get detailed information for an Anichin Donghua series
+ */
 export async function getAnichinDetail(rawSlug) {
   const clean = rawSlug.replace(/^anichin:/, '').replace(/^\/|\/$/g, '');
   const seriesSlug = extractSeriesSlug(clean);
   const cacheKey = `anichin_detail_${seriesSlug}`;
   const cached = getFromCache(cacheKey, 10 * 60 * 1000);
-  if (cached) return cached;
+  if (cached && cached.episodes && cached.episodes.length > 0) return cached;
 
   let html;
-  try {
-    html = await fetchHtml(`/${seriesSlug}/`);
-  } catch (err) {
-    // If not found, try original clean slug
-    if (clean !== seriesSlug) {
+  if (clean.includes('episode')) {
+    try {
       html = await fetchHtml(`/${clean}/`);
-    } else {
-      throw err;
+    } catch (e) {
+      try {
+        html = await fetchHtml(`/seri/${seriesSlug}/`);
+      } catch (e2) {
+        html = await fetchHtml(`/${seriesSlug}/`);
+      }
+    }
+  } else {
+    try {
+      html = await fetchHtml(`/seri/${seriesSlug}/`);
+    } catch (e1) {
+      try {
+        html = await fetchHtml(`/series/${seriesSlug}/`);
+      } catch (e2) {
+        html = await fetchHtml(`/${seriesSlug}/`);
+      }
     }
   }
 
   // Title
   const titleMatch = html.match(/<h1[^>]*class="[^"]*entry-title[^"]*"[^>]*>(.*?)<\/h1>/i) ||
                      html.match(/<h1[^>]*>([^<]+)<\/h1>/i);
-  const title = titleMatch ? titleMatch[1].trim() : seriesSlug.replace(/-/g, ' ');
+  let title = titleMatch ? titleMatch[1].trim() : seriesSlug.replace(/-/g, ' ');
+  title = title.replace(/\s+Episode\s+\d+.*$/i, '').trim();
 
   // Poster & Backdrop
   const thumbMatch = html.match(/<div class="thumb"[^>]*>[\s\S]*?<img[^>]*src="([^"]+)"/i) ||
-                     html.match(/<div class="bigcontent"[^>]*>[\s\S]*?<img[^>]*src="([^"]+)"/i);
+                     html.match(/<div class="bigcontent"[^>]*>[\s\S]*?<img[^>]*src="([^"]+)"/i) ||
+                     html.match(/<div class="thumbnel"[^>]*>[\s\S]*?<img[^>]*src="([^"]+)"/i);
   let poster = thumbMatch ? thumbMatch[1] : '';
   if (poster && !poster.startsWith('http')) {
     poster = `${currentBase}${poster.startsWith('/') ? '' : '/'}${poster}`;
@@ -262,38 +379,16 @@ export async function getAnichinDetail(rawSlug) {
     }
   }
 
-  // Episode list
-  const episodes = [];
-  const ulMatch = html.match(/<div[^>]*class="[^"]*eplister[^"]*"[^>]*>[\s\S]*?<ul>([\s\S]*?)<\/ul>/i);
-  if (ulMatch) {
-    const liRegex = /<li[^>]*>([\s\S]*?)<\/li>/gi;
-    let lm;
-    while ((lm = liRegex.exec(ulMatch[1])) !== null) {
-      const li = lm[1];
-      const href = (li.match(/href="([^"]+)"/i) || [])[1];
-      const numStr = (li.match(/class="epl-num">([^<]+)</i) || [])[1];
-      const epTitle = (li.match(/class="epl-title">([^<]+)</i) || [])[1];
-      const epDate = (li.match(/class="epl-date">([^<]+)</i) || [])[1];
+  // Parse episodes with full multi-pattern support
+  let episodes = parseEpisodesFromHtml(html, poster);
 
-      if (href) {
-        const epSlug = href.replace(/^https?:\/\/[^\/]+/, '').replace(/^\/|\/$/g, '');
-        const epNum = numStr ? parseInt(numStr, 10) : (episodes.length + 1);
-        episodes.push({
-          id: `anichin:${epSlug}`,
-          slug: epSlug,
-          episode: isNaN(epNum) ? episodes.length + 1 : epNum,
-          episode_number: isNaN(epNum) ? episodes.length + 1 : epNum,
-          name: epTitle || `Episode ${numStr || (episodes.length + 1)}`,
-          title: epTitle || `Episode ${numStr || (episodes.length + 1)}`,
-          air_date: epDate || '',
-          still_path: poster
-        });
-      }
-    }
+  // If fetched archive page and found none, try fetching clean if it has 'episode'
+  if (episodes.length === 0 && fetchSlug !== clean && clean.includes('episode')) {
+    try {
+      const epHtml = await fetchHtml(`/${clean}/`);
+      episodes = parseEpisodesFromHtml(epHtml, poster);
+    } catch (e) {}
   }
-
-  // Urutkan episode dari episode 1 ke episode terakhir
-  episodes.sort((a, b) => a.episode - b.episode);
 
   const detail = {
     id: `anichin:${seriesSlug}`,
@@ -411,9 +506,30 @@ export async function resolveAnichinStream(rawEpisodeSlug) {
     }
   }
 
-  // Fallback: If direct OK.ru stream wasn't found, use first mirror as iframe embed
+  // Filter: hanya izinkan pemutar video embed resmi terpercaya (OK.ru, Dailymotion resmi, Rumble).
+  // Buang semua shortlink / iklan / spoofed players / anichin page redirect (seperti nunadrama, short.icu, rpmvid, dll).
+  const safeMirrors = mirrors.filter(m => {
+    const u = String(m.url || '').toLowerCase();
+    const isGenuineEmbed = m.isOkRu ||
+      u.includes('ok.ru/videoembed') ||
+      u.includes('dailymotion.com/embed') ||
+      u.includes('geo.dailymotion.com') ||
+      u.includes('rumble.com/embed');
+    const isSpamOrAd = u.includes('short.icu') ||
+      u.includes('rpmvid') ||
+      u.includes('anichin') ||
+      u.includes('nunadrama') ||
+      u.includes('turbovid') ||
+      u.includes('rubyvid') ||
+      u.includes('listeamed') ||
+      u.includes('ads') ||
+      /\bads\b/i.test(m.rawName || '');
+    return isGenuineEmbed && !isSpamOrAd;
+  });
+
+  // Fallback: Jika direct OK.ru stream tidak ditemukan, pakai mirror video embed pertama yang aman
   if (!streamResult) {
-    const firstEmbed = mirrors[0]?.url || null;
+    const firstEmbed = safeMirrors[0]?.url || null;
     streamResult = {
       source: 'anichin',
       playlist: null,
@@ -424,7 +540,7 @@ export async function resolveAnichinStream(rawEpisodeSlug) {
     };
   }
 
-  streamResult.mirrors = mirrors;
+  streamResult.mirrors = safeMirrors;
   setCache(cacheKey, streamResult, 15 * 60 * 1000);
   return streamResult;
 }
