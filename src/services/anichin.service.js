@@ -1,8 +1,8 @@
 import { getFromCache, setCache } from './cache.service.js';
 
-const PRIMARY_BASE = 'https://anichin.moe';
-const FALLBACK_BASES = ['https://anichin.care', 'https://anichin.club'];
-const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+const PRIMARY_BASE = 'https://anichin.tv';
+const FALLBACK_BASES = ['https://anichin.moe', 'https://anichin.net', 'https://anichin.co'];
+const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
 
 let currentBase = PRIMARY_BASE;
 
@@ -23,10 +23,18 @@ async function fetchHtml(urlPath) {
         headers: {
           'User-Agent': USER_AGENT,
           'Referer': `${base}/`,
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+          'Accept-Language': 'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
+          'Sec-Ch-Ua': '"Chromium";v="126", "Not/A)Brand";v="8", "Google Chrome";v="126"',
+          'Sec-Ch-Ua-Mobile': '?0',
+          'Sec-Ch-Ua-Platform': '"Windows"',
+          'Sec-Fetch-Dest': 'document',
+          'Sec-Fetch-Mode': 'navigate',
+          'Sec-Fetch-Site': 'same-origin',
+          'Upgrade-Insecure-Requests': '1'
         },
         redirect: 'follow',
-        signal: AbortSignal.timeout(15000)
+        signal: AbortSignal.timeout(12000)
       });
 
       if (!res.ok) {
@@ -36,7 +44,7 @@ async function fetchHtml(urlPath) {
       // Update active base if redirect landed on different domain
       try {
         const finalUrl = new URL(res.url);
-        if (finalUrl.origin && finalUrl.origin !== currentBase) {
+        if (finalUrl.origin && finalUrl.origin !== currentBase && tryBases.includes(finalUrl.origin)) {
           currentBase = finalUrl.origin;
         }
       } catch (e) {}
@@ -47,7 +55,7 @@ async function fetchHtml(urlPath) {
     }
   }
 
-  throw lastError || new Error('Gagal menghubungi Anichin');
+  throw lastError || new Error('Gagal menghubungi server Anichin');
 }
 
 /**
