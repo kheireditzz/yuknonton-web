@@ -255,68 +255,10 @@
           <div class="watch-eps-scroll" id="watchEpsScroll"></div>
         </div>
 
-        <div class="watch-actions">
-          <button type="button" class="like-btn" id="likeBtn" aria-label="Suka">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v12"></path><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"></path></svg>
-            <span id="likeCount">0</span>
-          </button>
-          <button type="button" class="like-btn dislike" id="dislikeBtn" aria-label="Tidak Suka">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 14V2"></path><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"></path></svg>
-            <span id="dislikeCount">0</span>
-          </button>
-          <button type="button" class="like-btn" id="commentScrollBtn" aria-label="Ke Komentar">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-            <span id="commentCountChip">0</span>
-          </button>
-        </div>
-
         <p class="watch-desc" id="watchDesc"></p>
 
         <div class="watch-meta-grid" id="watchMeta"></div>
-
-        <!-- Poll Rating Pengguna -->
-        <div class="rating-poll" id="ratingPoll">
-          <div class="rating-poll-head">
-            <div class="overview-label" style="margin:0;">Poll Rating Pengguna</div>
-            <div class="rating-summary">
-              <span class="rating-avg" id="ratingAvg">0.0</span>
-              <span class="rating-avg-stars" id="ratingAvgStars" aria-hidden="true"></span>
-              <span class="rating-total" id="ratingTotal">0 suara</span>
-            </div>
-          </div>
-          <div class="rating-stars" id="ratingStars" role="radiogroup" aria-label="Beri rating">
-            <button type="button" class="star-btn" data-score="1" aria-label="1 bintang"></button>
-            <button type="button" class="star-btn" data-score="2" aria-label="2 bintang"></button>
-            <button type="button" class="star-btn" data-score="3" aria-label="3 bintang"></button>
-            <button type="button" class="star-btn" data-score="4" aria-label="4 bintang"></button>
-            <button type="button" class="star-btn" data-score="5" aria-label="5 bintang"></button>
-          </div>
-          <div class="rating-bars" id="ratingBars"></div>
-        </div>
-
-        <!-- Umpan balik aksi (inline, bukan notifikasi) -->
-        <div class="watch-feedback" id="watchFeedback" style="display:none;"></div>
       </section>
-
-      <!-- Baris 3: komentar -->
-      <div class="watch-comments" id="watchComments">
-        <div class="overview-label">Komentar (<span id="commentCount">0</span>)</div>
-
-        <form class="comment-form" id="commentForm">
-          <input type="text" id="commentName" class="neu-input comment-name" maxlength="40" placeholder="Nama kamu (opsional)">
-          <div class="comment-input-row">
-            <input type="text" id="commentText" class="neu-input" maxlength="600" placeholder="Tulis komentar..." autocomplete="off">
-            <button type="submit" class="tactile-btn primary comment-send-btn" id="commentSendBtn">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
-              Kirim
-            </button>
-          </div>
-        </form>
-
-        <div class="comment-list" id="commentList">
-          <div class="search-hero-hint">Belum ada komentar. Jadilah yang pertama!</div>
-        </div>
-      </div>
     </div>
 
 </main>
@@ -325,7 +267,7 @@
     YukNonton • Nonton film, serial &amp; donghua viral sub Indo • Data dari TMDB, VidLink &amp; Anichin
   </footer>
 
-  <script src="/js/api.js?v=2.2.0"></script>
-  <script src="/js/core.js?v=2.2.0"></script>
+  <script src="/js/api.js?v=2.3.0"></script>
+  <script src="/js/core.js?v=2.3.0"></script>
 </body>
 </html>

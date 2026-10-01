@@ -934,10 +934,6 @@
       renderWatchInfo();
     }).catch(() => {});
 
-    loadLikes(id, token, signal);
-    loadComments(id, token, signal);
-    loadRating(id, token, signal);
-
     const isAnichin = watchState.type === 'anichin' || String(id).startsWith('anichin:');
     const isSeries = watchState.type === 'tv' || isAnichin;
 
@@ -1111,11 +1107,6 @@
     $('#watchDesc').textContent = '';
     $('#watchMeta').innerHTML = '';
     $('#watchAvatarImg').src = '/img/no-poster.svg';
-    $('#likeCount').textContent = '0';
-    $('#dislikeCount').textContent = '0';
-    $('#commentCount').textContent = '0';
-    $('#commentCountChip').textContent = '0';
-    renderLoading('#commentList', 'Memuat komentar...');
     closeQualityMenu();
     $('#qualityPicker').style.display = 'none';
     $('#watchEpisodes').style.display = 'none';
@@ -1461,177 +1452,7 @@
     ).join('');
   }
 
-  // ── Likes ────────────────────────────────────────────────
-  function loadLikes(id, token, signal) {
-    Api.likes(id, signal).then(res => {
-      if (!isWatchActive(token)) return;
-      watchState.likes = { likes: res.likes || 0, dislikes: res.dislikes || 0 };
-      renderLikes();
-    }).catch(() => {});
-  }
 
-  function renderLikes() {
-    $('#likeCount').textContent = watchState.likes.likes;
-    $('#dislikeCount').textContent = watchState.likes.dislikes;
-    $('#likeBtn').classList.toggle('voted', watchState.myVote === 1);
-    $('#dislikeBtn').classList.toggle('voted', watchState.myVote === -1);
-  }
-
-  // Umpan balik halus di dalam watch view (pengganti notifikasi)
-  let feedbackTimer = null;
-  function showFeedback(kind, message) {
-    const el = $('#watchFeedback');
-    if (!el) return;
-    const ico = kind === 'error' ? 'alert-triangle' : kind === 'success' ? 'check' : 'info';
-    el.className = 'watch-feedback ' + kind;
-    el.innerHTML = `<span class="watch-feedback-ico">${icon(ico, 15, 2.3)}</span><span>${escapeHtml(message)}</span>`;
-    el.style.display = 'flex';
-    clearTimeout(feedbackTimer);
-    feedbackTimer = setTimeout(() => { el.style.display = 'none'; }, 2600);
-  }
-
-  function vote(dir) {
-    const id = watchState.id;
-    if (!id || watchState.myVote === dir) return;
-    const payload = {};
-    if (dir === 1) payload.like = 1; else payload.dislike = 1;
-    if (watchState.myVote === 1) payload.like = -1;
-    if (watchState.myVote === -1) payload.dislike = -1;
-    Api.like(id, payload).then(res => {
-      watchState.likes = { likes: res.likes, dislikes: res.dislikes };
-      watchState.myVote = dir;
-      renderLikes();
-      showFeedback('success', dir === 1 ? 'Kamu menyukai judul ini.' : 'Kamu tidak menyukai judul ini.');
-    }).catch(() => showFeedback('error', 'Gagal menyimpan like. Periksa koneksi lalu coba lagi.'));
-  }
-
-  // ── Rating Poll ──────────────────────────────────────────
-  function loadRating(id, token, signal) {
-    Api.ratings(id, signal).then(res => {
-      if (!isWatchActive(token)) return;
-      watchState.rating = res;
-      renderRating();
-    }).catch(() => {});
-  }
-
-  function starsHtml(filled, total = 5, size = 14) {
-    let h = '';
-    for (let i = 1; i <= total; i++) {
-      h += `<span class="star-ico${i <= filled ? ' on' : ''}">${icon('star', size, 2.2)}</span>`;
-    }
-    return h;
-  }
-
-  function renderRating() {
-    const r = watchState.rating || { average: 0, total: 0, counts: {}, distribution: {} };
-    $('#ratingAvg').textContent = (r.average || 0).toFixed(1);
-    $('#ratingTotal').textContent = (r.total || 0) + ' suara';
-    const filled = Math.round(r.average || 0);
-    $('#ratingAvgStars').innerHTML = starsHtml(filled, 5, 14);
-
-    $$('#ratingStars .star-btn').forEach(b => {
-      b.innerHTML = icon('star', 22, 2);
-    });
-
-    const bars = $('#ratingBars');
-    bars.innerHTML = '';
-    for (let s = 5; s >= 1; s--) {
-      const pct = (r.distribution && r.distribution[s]) || 0;
-      const cnt = (r.counts && r.counts[s]) || 0;
-      bars.insertAdjacentHTML('beforeend', `
-        <div class="rating-bar-row">
-          <span class="rating-bar-label">${s}${icon('star', 10, 2.4)}</span>
-          <div class="rating-bar-track"><div class="rating-bar-fill" style="width:${pct}%"></div></div>
-          <span class="rating-bar-count">${cnt}</span>
-        </div>`);
-    }
-    $$('#ratingStars .star-btn').forEach(b => {
-      b.classList.toggle('picked', Number(b.dataset.score) <= watchState.myRating);
-    });
-  }
-
-  function submitRating(score) {
-    const id = watchState.id;
-    if (!id) return;
-    watchState.myRating = score;
-    Api.rate(id, score).then(res => {
-      watchState.rating = res;
-      renderRating();
-      showFeedback('success', 'Rating ' + score + ' bintang berhasil dikirim.');
-    }).catch(() => showFeedback('error', 'Gagal mengirim rating. Periksa koneksi lalu coba lagi.'));
-  }
-
-  // ── Comments ─────────────────────────────────────────────
-  function loadComments(id, token, signal) {
-    renderLoading('#commentList', 'Memuat komentar...');
-    Api.comments(id, signal).then(res => {
-      if (!isWatchActive(token)) return;
-      renderComments(res);
-    }).catch(err => {
-      if (isAbort(err) || !isWatchActive(token)) return;
-      noteInto('#commentList', 'error', 'Gagal memuat komentar. Periksa koneksi lalu coba lagi.');
-    });
-  }
-
-  function renderComments(res) {
-    const list = (res && res.data) || [];
-    const count = (res && res.count) || list.length;
-    $('#commentCount').textContent = count;
-    $('#commentCountChip').textContent = count;
-    const box = $('#commentList');
-    if (!list.length) {
-      noteInto(box, 'empty', 'Belum ada komentar. Jadilah yang pertama berkomentar.');
-      return;
-    }
-    box.innerHTML = '';
-    list.forEach(c => {
-      const el = document.createElement('div');
-      el.className = 'comment-item';
-      el.innerHTML = `
-        <div class="comment-avatar">${escapeHtml((c.name || 'A').trim().charAt(0).toUpperCase())}</div>
-        <div class="comment-body">
-          <div class="comment-head">
-            <span class="comment-author">${escapeHtml(c.name || 'Pengguna Anonim')}</span>
-            <span class="comment-time">${timeAgo(c.createdAt)}</span>
-          </div>
-          <div class="comment-text">${escapeHtml(c.text)}</div>
-        </div>`;
-      box.appendChild(el);
-    });
-  }
-
-  function submitComment(e) {
-    e.preventDefault();
-    const id = watchState.id;
-    if (!id) return;
-    const text = $('#commentText').value.trim();
-    if (!text) {
-      $('#commentText').focus();
-      $('#commentText').classList.add('input-error');
-      setTimeout(() => $('#commentText').classList.remove('input-error'), 1600);
-      return;
-    }
-    const btn = $('#commentSendBtn');
-    btn.disabled = true;
-    Api.addComment(id, { name: $('#commentName').value.trim(), text }).then(() => {
-      $('#commentText').value = '';
-      loadComments(id);
-      showFeedback('success', 'Komentar berhasil dikirim.');
-    }).catch(() => showFeedback('error', 'Gagal mengirim komentar. Periksa koneksi lalu coba lagi.'))
-      .finally(() => { btn.disabled = false; });
-  }
-
-  function timeAgo(ts) {
-    const diff = Math.max(0, Date.now() - (ts || 0));
-    const m = Math.floor(diff / 60000);
-    if (m < 1) return 'baru saja';
-    if (m < 60) return m + ' menit lalu';
-    const h = Math.floor(m / 60);
-    if (h < 24) return h + ' jam lalu';
-    const d = Math.floor(h / 24);
-    if (d < 30) return d + ' hari lalu';
-    return new Date(ts).toLocaleDateString('id-ID');
-  }
 
   function closePlayer() {
     setWatchProgress();
@@ -1728,19 +1549,6 @@
     });
     document.addEventListener('click', (e) => {
       if (!e.target.closest('#qualityPicker')) closeQualityMenu();
-    });
-
-    $('#likeBtn').addEventListener('click', () => vote(1));
-    $('#dislikeBtn').addEventListener('click', () => vote(-1));
-    $('#commentScrollBtn').addEventListener('click', () => {
-      $('#watchComments').scrollIntoView({ behavior: 'smooth', block: 'start' });
-      setTimeout(() => $('#commentText').focus(), 300);
-    });
-    $('#commentForm').addEventListener('submit', submitComment);
-
-    $$('#ratingStars .star-btn').forEach(b => {
-      b.innerHTML = icon('star', 22, 2);
-      b.addEventListener('click', () => submitRating(Number(b.dataset.score)));
     });
 
     document.addEventListener('keydown', (e) => {
