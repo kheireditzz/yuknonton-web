@@ -23,6 +23,11 @@ window.Api = (() => {
     return data;
   }
 
+  const playCache = new Map();
+  function playKey(id, type, season, episode) {
+    return `${id}:${type || 'movie'}:${season || ''}:${episode || ''}`;
+  }
+
   return {
     home: (signal) => get('/api/home', signal),
     categories: (signal) => get('/api/categories', signal),
@@ -32,10 +37,23 @@ window.Api = (() => {
     movie: (id, type, signal) => get(`/api/${type === 'tv' ? 'tv' : 'movie'}?id=${encodeURIComponent(id)}`, signal),
     tvSeasons: (id, signal) => get(`/api/tv/seasons?id=${encodeURIComponent(id)}`, signal),
     tvEpisodes: (id, season, signal) => get(`/api/tv/episodes?id=${encodeURIComponent(id)}&season=${encodeURIComponent(season)}`, signal),
-    play: (id, type, season, episode, signal) =>
-      get(`/api/play?id=${encodeURIComponent(id)}&type=${type || 'movie'}` + (season ? `&season=${season}&episode=${episode}` : ''), signal),
-    prefetchPlay: (id, type, season, episode) =>
-      get(`/api/play?id=${encodeURIComponent(id)}&type=${type || 'movie'}` + (season ? `&season=${season}&episode=${episode}` : '')).catch(() => null),
+    play: (id, type, season, episode, signal) => {
+      const key = playKey(id, type, season, episode);
+      if (playCache.has(key)) return playCache.get(key);
+      const p = get(`/api/play?id=${encodeURIComponent(id)}&type=${type || 'movie'}` + (season ? `&season=${season}&episode=${episode}` : ''), signal)
+        .catch(err => { playCache.delete(key); throw err; });
+      playCache.set(key, p);
+      return p;
+    },
+    prefetchPlay: (id, type, season, episode) => {
+      const key = playKey(id, type, season, episode);
+      if (!playCache.has(key)) {
+        const p = get(`/api/play?id=${encodeURIComponent(id)}&type=${type || 'movie'}` + (season ? `&season=${season}&episode=${episode}` : ''))
+          .catch(() => { playCache.delete(key); return null; });
+        playCache.set(key, p);
+      }
+      return playCache.get(key);
+    },
     comments: (id, signal) => get(`/api/comments?id=${encodeURIComponent(id)}`, signal),
     addComment: (id, payload, signal) => post(`/api/comments?id=${encodeURIComponent(id)}`, payload, signal),
     likes: (id, signal) => get(`/api/likes?id=${encodeURIComponent(id)}`, signal),

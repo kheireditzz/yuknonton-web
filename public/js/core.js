@@ -962,7 +962,6 @@
       setupWatchServers(stream, token);
 
       if (hasDirect) {
-        $('#playerStatus').textContent = 'Menemukan sumber stream. Memutar...';
         setupQualities(stream);
         initPlayer(stream, false, token);
       } else {
@@ -1098,7 +1097,7 @@
     errBox.style.display = 'none';
     errBox.innerHTML = '';
     status.style.display = '';
-    status.innerHTML = `<span class="player-spin">${icon('loader', 18, 2.3)}</span> Menghubungi server streaming...`;
+    status.innerHTML = `<span class="player-spin">${icon('loader', 18, 2.3)}</span> Memuat video...`;
     destroyHls();
     video.pause();
     video.removeAttribute('src');
