@@ -286,7 +286,7 @@ public class MainActivity extends AppCompatActivity {
         decor.setSystemUiVisibility(View.SYSTEM_UI_FLAG_VISIBLE);
         WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
         WindowInsetsControllerCompat insets = WindowCompat.getInsetsController(getWindow(), decor);
-        if (insets != null) insets.showSystemUI();
+        if (insets != null) insets.show(androidx.core.view.WindowInsetsCompat.Type.systemBars());
         setupNeumorphicBars();
     }
 
