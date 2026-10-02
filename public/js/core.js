@@ -261,7 +261,11 @@
     'message': '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>',
     'chevron-down': '<polyline points="6 9 12 15 18 9"></polyline>',
     check: '<polyline points="20 6 9 17 4 12"></polyline>',
-    loader: '<line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>'
+    loader: '<line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>',
+    play: '<polygon points="6 3 20 12 6 21 6 3"></polygon>',
+    pause: '<rect x="6" y="4" width="4" height="16" rx="1"></rect><rect x="14" y="4" width="4" height="16" rx="1"></rect>',
+    video: '<polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>',
+    bolt: '<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"></path>'
   };
 
   function icon(name, size = 16, strokeWidth = 2.2) {
@@ -594,8 +598,100 @@
     const host = $('#homeRows');
     if (!host) return;
     host.innerHTML = '';
-    if (!rows.length) return;
-    rows.forEach(row => host.appendChild(renderHomeRow(row)));
+    host.appendChild(buildTvLiveRow());
+    if (rows.length) rows.forEach(row => host.appendChild(renderHomeRow(row)));
+  }
+
+  // ── Baris Siaran TV Live (iptables iptv-org via /api/tv) ───────────────
+  let tvCats = [];
+  let tvActiveCat = 'sports';
+  let tvCache = {};
+
+  function buildTvLiveRow() {
+    const section = document.createElement('section');
+    section.className = 'home-row tv-live-row';
+    section.innerHTML = `
+      <div class="home-row-head">
+        <div class="home-row-title">
+          <span class="home-row-ico live">${icon('video', 15, 2.3)}</span>
+          <span>Siaran TV Live</span>
+          <span class="live-badge"><span class="live-dot"></span>LIVE</span>
+        </div>
+        <div class="tv-cat-chips" id="tvCatChips"></div>
+      </div>
+      <div class="home-row-strip" id="tvStrip"><div class="watch-related-loading"><span class="player-spin">${icon('loader', 16, 2.3)}</span> Memuat kanal...</div></div>
+    `;
+    if (!tvCats.length) {
+      Api.tvCategories().then(r => {
+        tvCats = r.data || [];
+        renderTvCatChips();
+      }).catch(() => {});
+    }
+    queueMicrotask(() => renderTvCatChips());
+    loadTvChannels(tvActiveCat);
+    return section;
+  }
+
+  function renderTvCatChips() {
+    const box = $('#tvCatChips');
+    if (!box) return;
+    const list = (tvCats && tvCats.length) ? tvCats : [{ id: 'sports', label: 'Bola' }];
+    box.innerHTML = '';
+    list.forEach(c => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'tv-cat-chip' + (c.id === tvActiveCat ? ' active' : '');
+      b.textContent = c.label;
+      b.addEventListener('click', () => {
+        tvActiveCat = c.id;
+        renderTvCatChips();
+        loadTvChannels(c.id);
+      });
+      box.appendChild(b);
+    });
+  }
+
+  function loadTvChannels(cat) {
+    const strip = $('#tvStrip');
+    if (!strip) return;
+    const paint = (channels) => {
+      if ($('#tvStrip') !== strip) return;
+      strip.innerHTML = '';
+      if (!channels.length) {
+        strip.innerHTML = `<div class="watch-related-loading">Kanal tidak tersedia. Coba kategori lain.</div>`;
+        return;
+      }
+      channels.forEach(ch => strip.appendChild(renderTvCard(ch)));
+    };
+    if (tvCache[cat]) { paint(tvCache[cat]); return; }
+    strip.innerHTML = `<div class="watch-related-loading"><span class="player-spin">${icon('loader', 16, 2.3)}</span> Memuat kanal...</div>`;
+    Api.tvChannels(cat, 28).then(res => {
+      const data = res.data || [];
+      data.sort((a, b) => (b.football - a.football) || (b.https - a.https));
+      tvCache[cat] = data;
+      paint(data);
+    }).catch(() => {
+      if ($('#tvStrip') === strip) strip.innerHTML = `<div class="watch-related-loading">Gagal memuat kanal. Periksa koneksi.</div>`;
+    });
+  }
+
+  function renderTvCard(ch) {
+    const el = document.createElement('div');
+    el.className = 'row-card tv-card';
+    const logo = ch.logo || '';
+    el.innerHTML = `
+      <div class="row-card-poster tv-poster">
+        ${logo ? `<img loading="lazy" decoding="async" src="${escapeHtml(logo)}" alt="${escapeHtml(ch.name)}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.style.display='none'">` : ''}
+        <span class="tv-live-chip">LIVE</span>
+        ${ch.football ? `<span class="tv-ball-chip">${icon('bolt', 10, 2.4)} Bola</span>` : ''}
+        ${ch.quality ? `<span class="tv-qual-chip">${escapeHtml(ch.quality)}</span>` : ''}
+        <span class="row-card-play"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg></span>
+      </div>
+      <div class="row-card-title">${escapeHtml(ch.name)}</div>
+      <div class="row-card-sub">${escapeHtml(ch.group || 'Live TV')}</div>
+    `;
+    el.addEventListener('click', () => playStream(ch.id, 'livetv', null, null, ch.name));
+    return el;
   }
 
   function renderHomeRow(row) {
@@ -738,12 +834,28 @@
     return api;
   }
 
-  // ── Carousel banner info (lapor bug + PlayMusic) ─────────
+  // ── Carousel banner info (lapor bug + PlayMusic + Download APK) ─────────
   function initAdCarousel() {
     setupAutoSlider($('#adCarouselTrack'), $('#adCarouselDots'), {
       dotClass: 'ad-carousel-dot',
       interval: 5600
     });
+    refreshApkBanner();
+  }
+
+  // Banner APK selalu menunjuk build rilis terbaru (realtime via /api/app/version)
+  function refreshApkBanner() {
+    Api.appVersion().then(res => {
+      const v = res && res.data || {};
+      const link = $('#adApkBanner');
+      const label = $('#apkVersionLabel');
+      if (link && v.downloadUrl) link.href = v.downloadUrl;
+      if (label) {
+        const ver = v.version ? ('v' + v.version) : 'terbaru';
+        const size = v.size ? ' • ' + Math.round(v.size / 1048576) + ' MB' : '';
+        label.textContent = 'APK ' + ver + size + ' • auto-update';
+      }
+    }).catch(() => {});
   }
 
   async function loadBanner() {
@@ -1116,7 +1228,7 @@
     const token = ++fullSearchReq;
 
     beginLoading();
-    Api.search(q, signalOf(fullSearchAbort)).then(res => {
+    Api.search(q, fullSearchScope, signalOf(fullSearchAbort)).then(res => {
       if (token !== fullSearchReq) return;
       fullSearchLastResults = res.data || [];
       renderFullSearchResults();
@@ -1132,16 +1244,7 @@
     const countEl = $('#fullSearchResultsCount');
     if (!grid) return;
 
-    let items = fullSearchLastResults;
-    if (fullSearchScope === 'donghua') {
-      items = items.filter(x => x.provider === 'anichin' || x.type === 'anichin' || String(x.id).startsWith('anichin:'));
-    } else if (fullSearchScope === 'movie') {
-      items = items.filter(x => x.type === 'movie' && !String(x.id).startsWith('anichin:'));
-    } else if (fullSearchScope === 'tv') {
-      items = items.filter(x => x.type === 'tv' && !String(x.id).startsWith('anichin:'));
-    } else if (fullSearchScope === 'horror') {
-      items = items.filter(x => String(x.genre || '').toLowerCase().includes('horor') || String(x.genre || '').toLowerCase().includes('horror'));
-    }
+    const items = fullSearchLastResults;
 
     grid.innerHTML = '';
     if (countEl) countEl.textContent = `${items.length} ditemukan`;
@@ -1208,22 +1311,31 @@
       });
     });
 
-    // Genre cards
+    // Genre cards → set scope lalu cari (server-side, akurat)
     $$('.full-search-genre-card').forEach(card => {
       card.addEventListener('click', () => {
         const genre = card.dataset.genre;
-        if (genre) executeFullSearch(genre);
+        const scope = (genre || '').toLowerCase();
+        setScope(scope, true);
+        executeFullSearch(genre);
       });
     });
 
-    // Scope filter chips
+    // Scope filter chips → cari ulang server-side agar hasil maksimal
     $$('#fullSearchFilters .full-search-filter-chip').forEach(chip => {
       chip.addEventListener('click', () => {
-        $$('#fullSearchFilters .full-search-filter-chip').forEach(c => c.classList.remove('active'));
-        chip.classList.add('active');
-        fullSearchScope = chip.dataset.scope || 'all';
-        renderFullSearchResults();
+        setScope(chip.dataset.scope || 'all', false);
+        const input = $('#fullSearchInput');
+        if (input && input.value.trim()) executeFullSearch(input.value.trim());
+        else renderFullSearchResults();
       });
+    });
+  }
+
+  function setScope(scope, silent) {
+    fullSearchScope = scope || 'all';
+    $$('#fullSearchFilters .full-search-filter-chip').forEach(c => {
+      c.classList.toggle('active', (c.dataset.scope || 'all') === fullSearchScope);
     });
   }
 
@@ -1830,10 +1942,13 @@
     }
 
     const isAnichin = watchState.type === 'anichin' || String(watchState.id).startsWith('anichin:');
+    const isLiveTv = watchState.type === 'livetv' || String(watchState.id).startsWith('tv:');
     const parts = [];
+    if (isLiveTv) parts.push(`<span class="live-badge"><span class="live-dot"></span>LIVE TV</span>`);
     if (d.duration) parts.push(escapeHtml(d.duration));
     if (d.release) parts.push(escapeHtml(d.release));
     if (d.rating) parts.push(`<span class="rating">${icon('star', 12, 2.3)} ${Number(d.rating).toFixed(1)}</span>`);
+    if (isLiveTv && d.quality) parts.push(`<span class="meta-ico">${icon('bolt', 13, 2.3)} ${escapeHtml(d.quality)}</span>`);
     if (isAnichin) {
       parts.push(`<span class="meta-ico">${icon('sparkles', 13, 2.3)} Donghua Sub Indo</span>`);
     } else if (watchState.type === 'tv') {
@@ -1865,6 +1980,7 @@
     const wrap = $('#watchRelated');
     const strip = $('#watchRelatedStrip');
     if (!wrap || !strip) return;
+    if (currentType === 'livetv' || String(currentId).startsWith('tv:')) { wrap.style.display = 'none'; return; }
 
     wrap.style.display = '';
     strip.innerHTML = `
@@ -2065,7 +2181,10 @@
 
     $('#loadMoreBtn').addEventListener('click', loadMore);
 
-    $('#playerBackBtn').addEventListener('click', () => { closePlayer(); });
+    $('#playerBackBtn').addEventListener('click', () => {
+      if (fsElement() || window.__ynPseudoFs || window.__ynNativeFs) { exitPlayerFullscreen(); return; }
+      closePlayer();
+    });
 
     $('#watchEpNavPrev')?.addEventListener('click', () => {
       const sc = $('#watchEpsScroll');
@@ -2097,78 +2216,191 @@
     playerVideo.addEventListener('pause', () => { setWatchProgress(); updateEpisodeBars(); });
     playerVideo.addEventListener('ended', () => { setWatchProgress(); updateEpisodeBars(); });
 
-    // ── Auto-hide kontrol: tombol kembali & overlay muncul saat jeda/disentuh ──
+    // ── Auto-hide kontrol: layar disentuh → tombol back & layar penuh muncul, lalu hilang sendiri ──
     const playerWrap = $('#watchVideoWrap');
-    const stateIndicator = $('#playerStateIndicator');
+    const fsBtn = $('#playerFsBtn');
     let hideControlsTimer = null;
+
+    const fsElement = () => document.fullscreenElement || document.webkitFullscreenElement;
+
+    function hideControlsNow() {
+      if (playerWrap && !playerVideo.paused && !playerVideo.ended) {
+        playerWrap.classList.add('controls-hidden');
+      }
+    }
 
     function revealControls(temporary) {
       if (!playerWrap) return;
       playerWrap.classList.remove('controls-hidden');
       clearTimeout(hideControlsTimer);
       if (temporary && !playerVideo.paused && !playerVideo.ended) {
-        hideControlsTimer = setTimeout(() => {
-          if (!playerVideo.paused && !playerVideo.ended) playerWrap.classList.add('controls-hidden');
-        }, 3000);
-      }
-    }
-
-    function setPausedUI() {
-      if (!playerWrap || !stateIndicator) return;
-      clearTimeout(hideControlsTimer);
-      stateIndicator.classList.remove('is-anim-play');
-      stateIndicator.classList.add('is-paused');
-      playerWrap.classList.remove('controls-hidden');
-    }
-
-    function setPlayingUI(pulse) {
-      if (!playerWrap || !stateIndicator) return;
-      stateIndicator.classList.remove('is-paused');
-      playerWrap.classList.add('controls-hidden');
-      clearTimeout(hideControlsTimer);
-      if (pulse) {
-        void stateIndicator.offsetWidth;
-        stateIndicator.classList.add('is-anim-play');
-        setTimeout(() => stateIndicator.classList.remove('is-anim-play'), 700);
+        hideControlsTimer = setTimeout(hideControlsNow, 3000);
       }
     }
 
     function clearIndicatorUI() {
-      if (!playerWrap || !stateIndicator) return;
+      if (!playerWrap) return;
       clearTimeout(hideControlsTimer);
-      stateIndicator.classList.remove('is-paused', 'is-anim-play');
-      playerWrap.classList.remove('controls-hidden');
+      playerWrap.classList.remove('controls-hidden', 'yn-pseudo-fs', 'is-fullscreen');
+      window.__ynPseudoFs = false;
+      const pb = $('#playerPauseBtn');
+      if (pb) { pb.classList.remove('show'); pb.innerHTML = icon('play', 26, 1.6); }
+      try {
+        if (isNativeApp() && typeof AndroidApp.setLandscape === 'function') AndroidApp.setLandscape(false);
+      } catch (e) {}
     }
 
-    playerVideo.addEventListener('play', () => setPlayingUI(true));
-    playerVideo.addEventListener('pause', setPausedUI);
-    playerVideo.addEventListener('ended', setPausedUI);
-    stateIndicator.addEventListener('click', (e) => {
+    const isNativeApp = () => typeof AndroidApp !== 'undefined' && typeof AndroidApp.isAndroidApp === 'function';
+
+    function setPseudoFullscreen(on) {
+      if (!playerWrap) return;
+      playerWrap.classList.toggle('yn-pseudo-fs', on);
+      playerWrap.classList.toggle('is-fullscreen', on);
+      window.__ynPseudoFs = on;
+      try {
+        if (isNativeApp() && typeof AndroidApp.setLandscape === 'function') AndroidApp.setLandscape(on);
+      } catch (e) {}
+      if (on) revealControls(true);
+    }
+
+    function exitPlayerFullscreen() {
+      if (window.__ynPseudoFs) { setPseudoFullscreen(false); return; }
+      const el = fsElement();
+      const exit = document.exitFullscreen || document.webkitExitFullscreen;
+      if (el && exit) { exit.call(document); return; }
+      if (window.__ynNativeFs) {
+        try { if (typeof playerVideo.webkitExitFullscreen === 'function') playerVideo.webkitExitFullscreen(); } catch (e) {}
+        window.__ynNativeFs = false;
+      }
+    }
+
+    function togglePlayerFullscreen() {
+      if (window.__ynPseudoFs) { exitPlayerFullscreen(); return; }
+      const el = fsElement();
+      if (el) {
+        exitPlayerFullscreen();
+        return;
+      }
+      if (window.__ynNativeFs) {
+        exitPlayerFullscreen();
+        return;
+      }
+      if (isNativeApp()) {
+        setPseudoFullscreen(true);
+        return;
+      }
+      const target = playerWrap || playerVideo;
+      if (typeof target.requestFullscreen === 'function') {
+        target.requestFullscreen().catch(() => {
+          if (typeof playerVideo.webkitEnterFullscreen === 'function') playerVideo.webkitEnterFullscreen();
+        });
+      } else if (typeof target.webkitRequestFullscreen === 'function') {
+        target.webkitRequestFullscreen();
+      } else if (typeof playerVideo.webkitEnterFullscreen === 'function') {
+        playerVideo.webkitEnterFullscreen();
+      }
+      // Watchdog: fallback ke fullscreen video native jika tidak terdeteksi sama sekali.
+      setTimeout(() => {
+        if (!fsElement() && !window.__ynNativeFs && !window.__ynPseudoFs
+            && typeof playerVideo.webkitEnterFullscreen === 'function') {
+          playerVideo.webkitEnterFullscreen();
+        }
+      }, 400);
+    }
+
+    playerVideo.addEventListener('play', () => { setPauseGlyph(false); hideControlsNow(); });
+    playerVideo.addEventListener('pause', () => { setPauseGlyph(true); revealControls(false); });
+    playerVideo.addEventListener('ended', () => { setPauseGlyph(true); revealControls(false); });
+
+    // Tap/center = pause/play dasar + tombol indikator besar saat jeda
+    const pauseBtn = $('#playerPauseBtn');
+    function setPauseGlyph(paused) {
+      if (pauseBtn) {
+        pauseBtn.classList.toggle('show', paused && !playerVideo.ended && !!watchState.id);
+        pauseBtn.innerHTML = icon(paused ? 'play' : 'pause', 26, 1.6);
+      }
+    }
+    let suppressTap = false;
+    function togglePlayPause() {
+      if (!watchState.id || playerVideo.ended) return;
+      if (playerVideo.paused) playerVideo.play().catch(() => {});
+      else playerVideo.pause();
+    }
+    pauseBtn?.addEventListener('click', (e) => {
       e.stopPropagation();
-      if (playerVideo.paused || playerVideo.ended) playerVideo.play();
+      suppressTap = true;
+      setTimeout(() => { suppressTap = false; }, 400);
+      togglePlayPause();
     });
-    ['touchstart', 'mousemove'].forEach((ev) => {
-      playerVideo.addEventListener(ev, () => {
-        if (!playerVideo.paused && !playerVideo.ended) revealControls(true);
+    playerVideo.addEventListener('click', () => {
+      if (suppressTap) return;
+      togglePlayPause();
+      revealControls(true);
+    });
+    fsBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      togglePlayerFullscreen();
+    });
+    fsBtn?.addEventListener('touchstart', (e) => { e.stopPropagation(); }, { passive: true });
+    // Sentuh area pemutar → kontrol muncul; dilepas → hilang lagi (hanya saat playing)
+    if (playerWrap) {
+      playerWrap.addEventListener('touchstart', () => {
+        if (!playerVideo.paused && !playerVideo.ended) revealControls(false);
       }, { passive: true });
+      playerWrap.addEventListener('touchend', () => {
+        if (!playerVideo.paused && !playerVideo.ended) {
+          clearTimeout(hideControlsTimer);
+          hideControlsTimer = setTimeout(hideControlsNow, 350);
+        }
+      }, { passive: true });
+      playerWrap.addEventListener('touchcancel', () => {
+        if (!playerVideo.paused && !playerVideo.ended) hideControlsNow();
+      }, { passive: true });
+    }
+    playerVideo.addEventListener('mousemove', () => {
+      if (!playerVideo.paused && !playerVideo.ended) revealControls(true);
     });
     window.__clearIndicatorUI = clearIndicatorUI;
 
+    // ── Bridge tombol back Android (APK WebView) ──
+    window.__exitNativeFullscreen = exitPlayerFullscreen;
+
+    window.handleAndroidBack = () => {
+      if (fsElement() || window.__ynNativeFs || window.__ynPseudoFs) {
+        exitPlayerFullscreen();
+        return true;
+      }
+      const fullSearch = $('#fullSearchOverlay');
+      if (fullSearch && fullSearch.style.display !== 'none') { closeFullSearch(); return true; }
+      if (currentView === 'watch') { closePlayer(); return true; }
+      return false;
+    };
+
     // Fullscreen pemutar → paksa orientasi landscape agar tidak terkunci portrait
     const applyOrientation = (landscape) => {
+      try {
+        if (typeof AndroidApp !== 'undefined' && typeof AndroidApp.setLandscape === 'function') {
+          AndroidApp.setLandscape(!!landscape);
+        }
+      } catch (e) {}
       const so = screen.orientation;
       if (!so || typeof so.lock !== 'function') return;
       if (landscape) so.lock('landscape').catch(() => {});
       else if (typeof so.unlock === 'function') so.unlock();
     };
     const onFsChange = () => {
-      const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
-      applyOrientation(!!fsEl && (fsEl === playerVideo || playerVideo.contains(fsEl) || fsEl.contains(playerVideo)));
+      const fsEl = fsElement();
+      const fsActive = !!fsEl && (fsEl === playerVideo || playerVideo.contains(fsEl) || fsEl.contains(playerVideo) || fsEl === playerWrap);
+      applyOrientation(fsActive);
+      if (playerWrap) {
+        playerWrap.classList.toggle('is-fullscreen', fsActive);
+        if (fsActive) revealControls(false);
+      }
     };
     document.addEventListener('fullscreenchange', onFsChange);
     document.addEventListener('webkitfullscreenchange', onFsChange);
-    playerVideo.addEventListener('webkitbeginfullscreen', () => applyOrientation(true));
-    playerVideo.addEventListener('webkitendfullscreen', () => applyOrientation(false));
+    playerVideo.addEventListener('webkitbeginfullscreen', () => { window.__ynNativeFs = true; applyOrientation(true); if (playerWrap) revealControls(false); });
+    playerVideo.addEventListener('webkitendfullscreen', () => { window.__ynNativeFs = false; applyOrientation(false); if (playerWrap) playerWrap.classList.remove('is-fullscreen'); });
 
     $('#qualityToggle')?.addEventListener('click', (e) => {
       e.stopPropagation();

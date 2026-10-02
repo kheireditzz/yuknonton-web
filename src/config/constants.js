@@ -83,3 +83,31 @@ export const REALTIME_CACHE_TTL_MS = 90 * 1000;
 
 // Cache hasil resolve stream (vidlink) — membuat putar ulang & ganti-ganti judul instan.
 export const STREAM_CACHE_TTL_MS = 15 * 60 * 1000;
+
+// ── Siaran TV Live (iptv-org) ────────────────────────────────────────────
+// Playlist m3u per kategori. https diutamakan (mixed-content di WebView),
+// http tetap disertakan karena playback-nya lewat proxy server.
+export const TV_PLAYLISTS = {
+  sports: { label: 'Olahraga & Bola', urls: ['https://iptv-org.github.io/iptv/categories/sports.m3u'] },
+  news:   { label: 'Berita',           urls: ['https://iptv-org.github.io/iptv/categories/news.m3u'] },
+  kids:   { label: 'Anak',             urls: ['https://iptv-org.github.io/iptv/categories/kids.m3u'] },
+  movies: { label: 'Film',             urls: ['https://iptv-org.github.io/iptv/categories/movies.m3u'] },
+  music:  { label: 'Musik',            urls: ['https://iptv-org.github.io/iptv/categories/music.m3u'] },
+  general:{ label: 'Umum',             urls: ['https://iptv-org.github.io/iptv/categories/general.m3u'] }
+};
+
+// Kanal yang kemungkinan besar menayangkan sepak bola / olahraga populer.
+export const FOOTBALL_RE = /(foot\s?ball|soccer|\bliga\b|premier|la\s?liga|bundesliga|serie\s?a|champions|uefa|uecl|europa|beIN|vidio|RCTI|Emtek|Mola|SPOTV|True\s?Sport|Fox\s?Sports|Eleven|Setanta|Tennis|NBA|NFL|ESPN|Golf|Rugby|Cricket|MotoGP|Formula|F1|O\s?Sport)/i;
+
+// ── Scope pencarian → id katalog genre ───────────────────────────────────
+export const SEARCH_SCOPE_TO_CATALOG = {
+  horor: 'horor', horror: 'horor', action: 'aksi', aksi: 'aksi',
+  scifi: 'scifi', 'sci-fi': 'scifi', thriller: 'thriller',
+  misteri: 'misteri', mystery: 'misteri', romantis: 'romantis',
+  romance: 'romantis', komedi: 'komedi', comedy: 'komedi', drama: 'drama',
+  animasi: 'animasi', animation: 'animasi', petualangan: 'petualangan',
+  adventure: 'petualangan', keluarga: 'keluarga', family: 'keluarga',
+  dokumenter: 'dokumenter', documentary: 'dokumenter', fantasi: 'fantasi',
+  fantasy: 'fantasi', xianxia: 'donghua', wuxia: 'drama-china',
+  anime: 'anime'
+};

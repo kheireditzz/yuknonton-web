@@ -1,10 +1,29 @@
-import { scrapeHome, scrapeMovieDetail, scrapeTvDetail, scrapeSearch, scrapeSeasons, scrapeEpisodes } from '../services/tmdb.service.js';
+import { scrapeHome, scrapeMovieDetail, scrapeTvDetail, scrapeSearch, scrapeSeasons, scrapeEpisodes, scrapeCatalog } from '../services/tmdb.service.js';
 import { getFromCache, setCache } from '../services/cache.service.js';
 import { listCategories, getCatalog, getRows } from '../services/catalog.service.js';
 import { resolveMovieStream, resolveTvStream } from '../services/vidlink.service.js';
 import { getAnichinCatalog, searchAnichin, getAnichinDetail, resolveAnichinStream } from '../services/anichin.service.js';
 import { getComments, addComment, getLikes, applyLikeDelta, getRating, applyRating } from '../services/interactions.service.js';
-import { STREAM_CACHE_TTL_MS } from '../config/constants.js';
+import { getTvChannels, listTvCategories } from '../services/tv.service.js';
+import { getAppVersion } from '../services/appversion.service.js';
+import { STREAM_CACHE_TTL_MS, SEARCH_SCOPE_TO_CATALOG, CATALOG_BY_ID } from '../config/constants.js';
+
+// Scope genre pencarian → path katalog genre TMDB (valid, tidak diabaikan server).
+const SEARCH_SCOPES = Object.fromEntries(
+  Object.entries(SEARCH_SCOPE_TO_CATALOG)
+    .map(([scope, catId]) => [scope, CATALOG_BY_ID[catId]?.paths])
+    .filter(([, paths]) => Array.isArray(paths) && paths.length)
+);
+
+// ── Helper Siaran TV: id = "tv:" + base64url(JSON{u,n,g,l}) — self-contained
+function decodeTvId(id) {
+  try {
+    const json = Buffer.from(String(id).replace(/^tv:/, ''), 'base64url').toString('utf8');
+    const o = JSON.parse(json);
+    if (o && typeof o.u === 'string' && /^https?:\/\//i.test(o.u)) return o;
+  } catch (e) {}
+  return null;
+}
 
 // In-flight map: dedup request stream yang identik (mis. prefetch + user klik putar).
 const streamInflight = new Map();
@@ -128,29 +147,76 @@ export async function handleApiRoute(req, res, pathname, parsedUrl) {
     return;
   }
 
+  // ── SIARAN TV LIVE ──
+  if (pathname === '/api/tv/categories') {
+    res.writeHead(200);
+    res.end(JSON.stringify({ data: listTvCategories() }));
+    return;
+  }
+
+  if (pathname === '/api/tv/channels') {
+    const cat = parsedUrl.searchParams.get('cat') || 'sports';
+    const sp = parsedUrl.searchParams;
+    const data = await getTvChannels(cat, {
+      football: sp.get('football') === '1',
+      secure: sp.get('secure') === '1',
+      q: sp.get('q') || '',
+      limit: sp.get('limit') || '120'
+    });
+    res.writeHead(200, { 'Cache-Control': 'public, max-age=1800' });
+    res.end(JSON.stringify(data));
+    return;
+  }
+
+  // ── VERSI APK (realtime dari GitHub Releases) ──
+  if (pathname === '/api/app/version') {
+    const v = await getAppVersion();
+    res.writeHead(200, { 'Cache-Control': 'public, max-age=600' });
+    res.end(JSON.stringify({ data: v }));
+    return;
+  }
+
   // ── SEARCH ──
   if (pathname === '/api/search') {
     const q = (parsedUrl.searchParams.get('q') || '').trim();
+    const scope = (parsedUrl.searchParams.get('scope') || 'all').trim().toLowerCase();
     if (!q) {
       res.writeHead(400);
       res.end(JSON.stringify({ error: 'q parameter is required' }));
       return;
     }
-    const key = 'search_' + q.toLowerCase();
+    const key = 'search_' + scope + '_' + q.toLowerCase();
     const cached = getFromCache(key);
     if (cached) {
       res.writeHead(200);
-      res.end(JSON.stringify({ query: q, cached: true, count: cached.length, data: cached }));
+      res.end(JSON.stringify({ query: q, scope, cached: true, count: cached.length, data: cached }));
       return;
     }
-    const [anichinResults, tmdbResults] = await Promise.all([
-      searchAnichin(q).catch(() => []),
-      scrapeSearch(q).catch(() => [])
-    ]);
-    const results = [...anichinResults, ...tmdbResults];
+
+    let results = [];
+    if (SEARCH_SCOPES[scope]) {
+      // Scope genre: pakai katalog genre TMDB (filter genre di halaman search
+      // web TMDB diabaikan server), lalu cocokkan kata kunci pada judul.
+      const paths = SEARCH_SCOPES[scope];
+      const pool = await scrapeCatalog(paths).catch(() => []);
+      const ql = q.toLowerCase();
+      results = pool.filter(x => String(x.name || x.title || '').toLowerCase().includes(ql));
+      if (results.length === pool.length || !results.length) results = pool;
+    } else if (scope === 'donghua') {
+      results = await searchAnichin(q).catch(() => []);
+    } else {
+      const [anichinResults, tmdbResults] = await Promise.all([
+        scope === 'all' ? searchAnichin(q).catch(() => []) : Promise.resolve([]),
+        scrapeSearch(q).catch(() => [])
+      ]);
+      results = [...anichinResults, ...tmdbResults];
+      if (scope === 'movie') results = results.filter(x => x.type === 'movie' && !String(x.id).startsWith('anichin:'));
+      if (scope === 'tv') results = results.filter(x => x.type === 'tv' && !String(x.id).startsWith('anichin:'));
+    }
+
     if (results.length > 0) setCache(key, results);
     res.writeHead(200);
-    res.end(JSON.stringify({ query: q, cached: false, count: results.length, data: results }));
+    res.end(JSON.stringify({ query: q, scope, cached: false, count: results.length, data: results }));
     return;
   }
 
@@ -161,6 +227,26 @@ export async function handleApiRoute(req, res, pathname, parsedUrl) {
     if (!id) {
       res.writeHead(400);
       res.end(JSON.stringify({ error: 'id parameter is required' }));
+      return;
+    }
+
+    if (id.startsWith('tv:')) {
+      const tv = decodeTvId(id);
+      if (!tv) {
+        res.writeHead(404);
+        res.end(JSON.stringify({ error: 'Channel not found' }));
+        return;
+      }
+      res.writeHead(200);
+      res.end(JSON.stringify({
+        cached: false,
+        data: {
+          id, type: 'livetv', title: tv.n || 'Siaran TV', name: tv.n || 'Siaran TV',
+          poster: tv.l || '', backdrop: tv.l || '', overview: 'Siaran TV langsung (live streaming).',
+          genre: tv.g || 'Live TV', genres: [tv.g || 'Live TV'],
+          provider: 'iptv', quality: tv.q || '', live: true
+        }
+      }));
       return;
     }
 
@@ -329,6 +415,34 @@ export async function handleApiRoute(req, res, pathname, parsedUrl) {
     if (!id) {
       res.writeHead(400);
       res.end(JSON.stringify({ error: 'id parameter is required' }));
+      return;
+    }
+
+    // Siaran TV: stream HLS langsung, tanpa resolve eksternal.
+    if (id.startsWith('tv:') || type === 'livetv') {
+      const tv = decodeTvId(id);
+      if (!tv) {
+        res.writeHead(404);
+        res.end(JSON.stringify({ error: 'Channel not found', id }));
+        return;
+      }
+      res.setHeader('Cache-Control', 'no-store');
+      res.writeHead(200);
+      res.end(JSON.stringify({
+        id,
+        type: 'livetv',
+        playlist: {
+          source: 'iptv',
+          playlist: tv.u,
+          mp4: null,
+          qualities: {},
+          mirrors: [],
+          embed: null,
+          captions: []
+        },
+        live: true,
+        channel: tv.n
+      }));
       return;
     }
 

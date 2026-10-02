@@ -18,6 +18,8 @@ import android.os.Looper;
 import android.os.Vibrator;
 import android.os.VibrationEffect;
 import android.view.View;
+import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.webkit.CookieManager;
 import android.webkit.DownloadListener;
 import android.webkit.JavascriptInterface;
@@ -55,6 +57,9 @@ public class MainActivity extends AppCompatActivity {
     private ProgressBar loadingBar;
     private ValueCallback<Uri[]> fileUploadCallback;
     private boolean doubleBackToExitPressedOnce = false;
+    private android.webkit.WebChromeClient.CustomViewCallback customViewCallback;
+    private View customView;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     @SuppressLint({"SetJavaScriptEnabled", "JavascriptInterface"})
     @Override
@@ -154,6 +159,39 @@ public class MainActivity extends AppCompatActivity {
 
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
+            public void onShowCustomView(View view, CustomViewCallback callback) {
+                if (customView != null) {
+                    callback.onCustomViewHidden();
+                    return;
+                }
+                customView = view;
+                customViewCallback = callback;
+                ViewGroup root = findViewById(R.id.rootContainer);
+                root.addView(view, new ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT));
+                webView.setVisibility(View.GONE);
+                loadingBar.setVisibility(View.GONE);
+                setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+                enterImmersiveFullscreen();
+            }
+
+            @Override
+            public void onHideCustomView() {
+                if (customView == null) return;
+                ViewGroup root = findViewById(R.id.rootContainer);
+                root.removeView(customView);
+                customView = null;
+                if (customViewCallback != null) {
+                    customViewCallback.onCustomViewHidden();
+                    customViewCallback = null;
+                }
+                webView.setVisibility(View.VISIBLE);
+                setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+                exitImmersiveFullscreen();
+            }
+
+            @Override
             public void onProgressChanged(WebView view, int newProgress) {
                 if (newProgress < 100) {
                     loadingBar.setVisibility(View.VISIBLE);
@@ -235,10 +273,69 @@ public class MainActivity extends AppCompatActivity {
         getWindow().setNavigationBarColor(0xFFE7E5E4);
     }
 
+    private void enterImmersiveFullscreen() {
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        applyImmersive();
+    }
+
+    private void exitImmersiveFullscreen() {
+        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        View decor = getWindow().getDecorView();
+        decor.setSystemUiVisibility(View.SYSTEM_UI_FLAG_VISIBLE);
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
+        WindowInsetsControllerCompat insets = WindowCompat.getInsetsController(getWindow(), decor);
+        if (insets != null) insets.showSystemUI();
+        setupNeumorphicBars();
+    }
+
+    @SuppressWarnings("deprecation")
+    private void applyImmersive() {
+        View decor = getWindow().getDecorView();
+        int flags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                | View.SYSTEM_UI_FLAG_FULLSCREEN
+                | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
+        decor.setSystemUiVisibility(flags);
+    }
+
+    private boolean isInCustomFullscreen() {
+        return customView != null;
+    }
+
+    private void onBackFromFullscreen() {
+        mainHandler.post(() -> webView.evaluateJavascript(
+                "if (typeof window.__exitNativeFullscreen === 'function') window.__exitNativeFullscreen();",
+                null));
+        mainHandler.postDelayed(() -> {
+            if (isInCustomFullscreen()) exitCustomFullscreen();
+        }, 250);
+    }
+
+    private void exitCustomFullscreen() {
+        if (customView == null) return;
+        ViewGroup root = findViewById(R.id.rootContainer);
+        root.removeView(customView);
+        customView = null;
+        if (customViewCallback != null) {
+            customViewCallback.onCustomViewHidden();
+            customViewCallback = null;
+        }
+        webView.setVisibility(View.VISIBLE);
+        exitImmersiveFullscreen();
+    }
+
     private void setupBackNavigation() {
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
+                if (isInCustomFullscreen()) {
+                    onBackFromFullscreen();
+                    return;
+                }
                 webView.evaluateJavascript(
                         "(function() { " +
                         "  if (typeof window.handleAndroidBack === 'function') { " +
@@ -256,7 +353,7 @@ public class MainActivity extends AppCompatActivity {
                             }
                             doubleBackToExitPressedOnce = true;
                             Toast.makeText(MainActivity.this, "Tekan sekali lagi untuk keluar dari YukNonton", Toast.LENGTH_SHORT).show();
-                            new Handler(Looper.getMainLooper()).postDelayed(() -> doubleBackToExitPressedOnce = false, 2000);
+                            mainHandler.postDelayed(() -> doubleBackToExitPressedOnce = false, 2000);
                         }
                 );
             }
@@ -320,6 +417,21 @@ public class MainActivity extends AppCompatActivity {
 
         WebAppInterface(Context context) {
             this.context = context;
+        }
+
+        @JavascriptInterface
+        public void setLandscape(boolean landscape) {
+            runOnUiThread(() -> {
+                try {
+                    if (landscape) {
+                        setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+                        enterImmersiveFullscreen();
+                    } else {
+                        setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+                        exitImmersiveFullscreen();
+                    }
+                } catch (Exception ignored) {}
+            });
         }
 
         @JavascriptInterface

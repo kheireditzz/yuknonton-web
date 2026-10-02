@@ -181,6 +181,11 @@ header.neu-header {
     radial-gradient(120% 120% at 15% 10%, rgba(255,255,255,0.2), rgba(255,255,255,0) 45%),
     linear-gradient(135deg, #A63248, var(--color-ciak) 55%, #4d1220);
 }
+.ad-banner-apk .ad-banner-bg {
+  background:
+    radial-gradient(120% 120% at 15% 10%, rgba(255,255,255,0.2), rgba(255,255,255,0) 45%),
+    linear-gradient(135deg, #2E9E4F, #00A63D 55%, #00592b);
+}
 .ad-banner-shine {
   position: absolute; inset: 0; z-index: 1;
   background: linear-gradient(115deg, transparent 35%, rgba(255,255,255,0.3) 50%, transparent 65%);
@@ -667,8 +672,10 @@ header.neu-header {
 .home-row { position: relative; }
 .home-row-head {
   display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; flex-wrap: wrap;
   margin-bottom: 14px;
 }
+.home-row-head .tv-cat-chips { max-width: 100%; }
 .home-row-title {
   display: flex; align-items: center; gap: 10px;
   font-family: 'Space Mono', monospace;
@@ -764,6 +771,54 @@ header.neu-header {
 }
 @media (min-width: 560px) { .row-card { flex-basis: 150px; } }
 @media (min-width: 800px) { .row-card { flex-basis: 168px; } }
+
+/* ── Siaran TV Live ─────────────────────────────────────── */
+.home-row-title .home-row-ico.live { color: var(--color-danger); }
+.tv-cat-chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.tv-cat-chips::-webkit-scrollbar { display: none; }
+.tv-cat-chip {
+  flex: 0 0 auto;
+  padding: 6px 13px;
+  border-radius: 999px;
+  border: none;
+  background: var(--bg-surface);
+  box-shadow: var(--neu-extruded-sm);
+  color: var(--color-text-muted);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 0.74rem;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.tv-cat-chip.active {
+  box-shadow: var(--neu-inset);
+  color: var(--color-primary);
+}
+.row-card-poster.tv-poster { background: #101418; }
+.row-card-poster.tv-poster img { object-fit: contain; padding: 16%; }
+.tv-live-chip {
+  position: absolute; top: 8px; left: 8px; z-index: 2;
+  display: inline-flex; align-items: center; gap: 4px;
+  background: var(--color-danger); color: #fff;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.58rem; font-weight: 700; letter-spacing: 0.08em;
+  padding: 3px 7px; border-radius: 6px;
+}
+.tv-ball-chip {
+  position: absolute; bottom: 8px; left: 8px; z-index: 2;
+  display: inline-flex; align-items: center; gap: 3px;
+  background: rgba(0,102,102,0.85); color: #fff;
+  font-size: 0.62rem; font-weight: 700;
+  padding: 3px 7px; border-radius: 6px;
+}
+.tv-qual-chip {
+  position: absolute; top: 8px; right: 8px; z-index: 2;
+  background: rgba(0,0,0,0.6); color: #fff;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.58rem; font-weight: 700;
+  padding: 3px 6px; border-radius: 6px;
+}
 
 /* ── Detail View (Full Page) ─────────────────────────────── */
 .detail-view {
@@ -1201,78 +1256,79 @@ body.watch-mode .footer-note { display: none; }
 .watch-back-overlay:hover { background: rgba(0,102,102,0.85); transform: translateY(-1px); }
 .watch-back-overlay:active { transform: scale(0.93); }
 
-/* Saat video diputar (playing): tombol kembali otomatis fade out menghilang */
-.watch-video-wrap.controls-hidden .watch-back-overlay {
+/* Saat video diputar (playing): tombol kembali & layar penuh otomatis fade out menghilang */
+.watch-video-wrap.controls-hidden .watch-back-overlay,
+.watch-video-wrap.controls-hidden .watch-fs-overlay {
   opacity: 0;
   pointer-events: none;
-  transform: translateY(-8px);
 }
+.watch-video-wrap.controls-hidden .watch-back-overlay { transform: translateY(-8px); }
+.watch-video-wrap.controls-hidden .watch-fs-overlay { transform: translateY(8px); }
 
-/* ── Overlay Logo Jeda (Pause) & Logo Putar (Play) di Tengah Video ── */
-.player-state-indicator {
-  position: absolute; left: 50%; top: 50%;
-  transform: translate(-50%, -50%) scale(0.85);
-  width: 72px; height: 72px;
-  border-radius: 50%;
-  background: rgba(15, 23, 42, 0.72);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1.5px solid rgba(255, 255, 255, 0.28);
-  color: #ffffff;
+/* ── Tombol Layar Penuh (auto-hide, sama perilaku dengan tombol kembali) ── */
+.watch-fs-overlay {
+  position: absolute; top: 12px; right: 12px; z-index: 5;
+  width: 44px; height: 44px; border-radius: 13px;
+  background: rgba(15,20,26,0.62);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.25);
+  color: #fff; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 1px 2px rgba(255, 255, 255, 0.25);
-  z-index: 4;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-.player-state-icon {
-  display: none;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Keadaan Jeda (Pause): Logo jeda muncul di tengah dan tombol kembali muncul */
-.player-state-indicator.is-paused {
+  box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  transition: opacity 0.32s cubic-bezier(0.4, 0, 0.2, 1), transform 0.32s cubic-bezier(0.4, 0, 0.2, 1), background 0.15s ease;
   opacity: 1;
   pointer-events: auto;
-  cursor: pointer;
-  transform: translate(-50%, -50%) scale(1);
+  transform: translateY(0);
 }
-.player-state-indicator.is-paused .state-pause {
-  display: flex;
-}
-.player-state-indicator.is-paused:hover {
-  background: rgba(0, 102, 102, 0.85);
-  transform: translate(-50%, -50%) scale(1.08);
-}
-.player-state-indicator.is-paused:active {
-  transform: translate(-50%, -50%) scale(0.94);
-}
+.watch-fs-overlay:hover { background: rgba(0,102,102,0.85); transform: translateY(-1px); }
+.watch-fs-overlay:active { transform: scale(0.93); }
+.watch-fs-overlay .fs-ico { display: inline-flex; align-items: center; justify-content: center; }
+.watch-fs-overlay .fs-ico-out { display: none; }
+.watch-video-wrap.is-fullscreen .watch-fs-overlay .fs-ico-in { display: none; }
+.watch-video-wrap.is-fullscreen .watch-fs-overlay .fs-ico-out { display: inline-flex; }
 
-/* Keadaan Putar (Play): Animasi logo putar berdenyut halus lalu menghilang */
-.player-state-indicator.is-anim-play {
-  pointer-events: none;
-  animation: playerStatePulsePlay 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+/* ── Tombol pause/play dasar di tengah (muncul hanya saat dijeda) ── */
+.watch-pause-overlay {
+  position: absolute; top: 50%; left: 50%; z-index: 6;
+  transform: translate(-50%, -50%) scale(0.7);
+  width: 76px; height: 76px; border-radius: 50%;
+  background: rgba(15,20,26,0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid rgba(255,255,255,0.28);
+  color: #fff; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 6px 22px rgba(0,0,0,0.4);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.22s ease, transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-.player-state-indicator.is-anim-play .state-play {
-  display: flex;
-}
+.watch-pause-overlay.show { opacity: 1; pointer-events: auto; transform: translate(-50%, -50%) scale(1); }
+.watch-pause-overlay:active { transform: translate(-50%, -50%) scale(0.9); }
 
-@keyframes playerStatePulsePlay {
-  0% {
-    opacity: 0.95;
-    transform: translate(-50%, -50%) scale(0.85);
-  }
-  50% {
-    opacity: 0.9;
-    transform: translate(-50%, -50%) scale(1.15);
-  }
-  100% {
-    opacity: 0;
-    transform: translate(-50%, -50%) scale(1.35);
-  }
+/* ── Mode layar penuh: pemutar memenuhi seluruh viewport ── */
+.watch-video-wrap:fullscreen,
+.watch-video-wrap:-webkit-full-screen,
+.watch-video-wrap.is-fullscreen,
+.watch-video-wrap.yn-pseudo-fs {
+  width: 100%; height: 100%;
+  max-width: 100vw; max-height: 100vh;
+  border-radius: 0;
+  aspect-ratio: auto;
+  background: #000;
+  display: flex; align-items: center; justify-content: center;
+}
+/* Pseudo-fullscreen untuk APK WebView (requestFullscreen pada div sering ditolak) */
+.watch-video-wrap.yn-pseudo-fs {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 9999;
+}
+.watch-video-wrap:fullscreen .player-video,
+.watch-video-wrap:-webkit-full-screen .player-video,
+.watch-video-wrap.is-fullscreen .player-video,
+.watch-video-wrap.yn-pseudo-fs .player-video {
+  width: 100%; height: 100%;
+  object-fit: contain;
 }
 
 /* ── Watch Video Server Switcher ── */
@@ -2044,6 +2100,9 @@ body.watch-mode .footer-note { display: none; }
 .full-search-filters::-webkit-scrollbar { display: none; }
 
 .full-search-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 8px 16px;
   border-radius: 999px;
   border: none;
